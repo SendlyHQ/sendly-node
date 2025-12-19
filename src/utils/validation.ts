@@ -19,7 +19,7 @@ export function validatePhoneNumber(phone: string): void {
 
   if (!e164Regex.test(phone)) {
     throw new ValidationError(
-      `Invalid phone number format: ${phone}. Expected E.164 format (e.g., +15551234567)`
+      `Invalid phone number format: ${phone}. Expected E.164 format (e.g., +15551234567)`,
     );
   }
 }
@@ -39,7 +39,7 @@ export function validateMessageText(text: string): void {
   // Warn about very long messages (but don't block them)
   if (text.length > 1600) {
     console.warn(
-      `Message is ${text.length} characters. This will be split into ${Math.ceil(text.length / 160)} segments.`
+      `Message is ${text.length} characters. This will be split into ${Math.ceil(text.length / 160)} segments.`,
     );
   }
 }
@@ -63,7 +63,7 @@ export function validateSenderId(from: string): void {
 
   if (!alphanumericRegex.test(from)) {
     throw new ValidationError(
-      `Invalid sender ID: ${from}. Must be 2-11 alphanumeric characters or a valid phone number.`
+      `Invalid sender ID: ${from}. Must be 2-11 alphanumeric characters or a valid phone number.`,
     );
   }
 }
@@ -87,6 +87,7 @@ export function validateLimit(limit?: number): void {
 
 /**
  * Validate message ID format
+ * Accepts: UUID format, msg_xxx, schd_xxx (scheduled), batch_xxx
  */
 export function validateMessageId(id: string): void {
   if (!id) {
@@ -97,9 +98,10 @@ export function validateMessageId(id: string): void {
     throw new ValidationError("Message ID must be a string");
   }
 
-  // UUID format or prefixed format
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  const prefixedRegex = /^msg_[a-zA-Z0-9]+$/;
+  // UUID format or prefixed format (msg_, schd_, batch_)
+  const uuidRegex =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const prefixedRegex = /^(msg|schd|batch)_[a-zA-Z0-9]+$/;
 
   if (!uuidRegex.test(id) && !prefixedRegex.test(id)) {
     throw new ValidationError(`Invalid message ID format: ${id}`);
@@ -172,7 +174,7 @@ export function getCountryFromPhone(phone: string): string | null {
 
   // Try to match country prefixes (longest first)
   const sortedPrefixes = Object.keys(countryPrefixes).sort(
-    (a, b) => b.length - a.length
+    (a, b) => b.length - a.length,
   );
 
   for (const prefix of sortedPrefixes) {
