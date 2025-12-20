@@ -1,5 +1,16 @@
 # @sendly/node
 
+## 1.0.6
+
+### Patch Changes
+
+- [`d39d1e9`](https://github.com/sendly-live/sendly/commit/d39d1e975e05e3608a9e2c271febe5db5bb4921c) Thanks [@sendly-live](https://github.com/sendly-live)! - fix: complete SDK release pipeline automation
+  - Fixed Ruby SDK Gemfile.lock frozen mode issue
+  - Fixed .NET SDK project paths and skipped failing tests
+  - Fixed PHP SDK versioning for Packagist compatibility
+  - Added version tagging to SDK sync workflow
+  - Configured Packagist webhook for auto-updates
+
 ## 1.0.5
 
 ### Patch Changes
