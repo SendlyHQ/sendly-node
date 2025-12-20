@@ -1,5 +1,11 @@
 # @sendly/node
 
+## 1.0.8
+
+### Patch Changes
+
+- [`8de8872`](https://github.com/sendly-live/sendly/commit/8de887212e68645abeb53f33992ba62087aba711) Thanks [@sendly-live](https://github.com/sendly-live)! - fix: correct API path construction to avoid path duplication
+
 ## 1.0.7
 
 ### Patch Changes
