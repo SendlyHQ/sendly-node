@@ -1,5 +1,21 @@
 # @sendly/node
 
+## 1.0.7
+
+### Patch Changes
+
+- [`8917c36`](https://github.com/sendly-live/sendly/commit/8917c36e8d8e303261f5c27c0809c0d5554e1b03) Thanks [@sendly-live](https://github.com/sendly-live)! - fix: SDK consistency fixes - base URLs, BatchStatus enums, and versions
+
+  **Critical Fixes:**
+  - Node.js/Python SDK base URL: `/api` → `/api/v1` (was causing 404 errors)
+
+  **BatchStatus Enum Alignment (matches server):**
+  - Rust/Go/.NET/Java: `partially_completed` → `partial_failure`
+  - Node.js/Python: Added missing `failed` status
+
+  **Version Alignment:**
+  - All SDKs now use version 1.0.5 in VERSION constants and User-Agent headers
+
 ## 1.0.6
 
 ### Patch Changes
