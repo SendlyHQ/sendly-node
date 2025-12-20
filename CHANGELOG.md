@@ -1,5 +1,11 @@
 # @sendly/node
 
+## 1.0.2
+
+### Patch Changes
+
+- Release pipeline improvements and bug fixes
+
 ## 1.0.1
 
 ### Patch Changes
