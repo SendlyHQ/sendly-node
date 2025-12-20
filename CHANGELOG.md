@@ -1,5 +1,22 @@
 # @sendly/node
 
+## 1.0.5
+
+### Patch Changes
+
+- [`5441597`](https://github.com/sendly-live/sendly/commit/544159770fd326b095fe1c55b0a9507d21fb4297) Thanks [@sendly-live](https://github.com/sendly-live)! - chore: verify automated SDK release pipeline
+
+  This is a test release to verify the full automated SDK release pipeline works end-to-end:
+  - npm: @sendly/node, @sendly/cli
+  - PyPI: sendly
+  - RubyGems: sendly
+  - crates.io: sendly
+  - NuGet: Sendly
+  - Maven Central: live.sendly:sendly-java
+  - Go: github.com/sendly-live/sendly-go
+  - Packagist: sendly/sendly-php
+  - Homebrew: sendly-live/tap/sendly
+
 ## 1.0.4
 
 ### Patch Changes
