@@ -107,7 +107,6 @@ export {
   parseWebhookEvent,
   generateWebhookSignature,
   type WebhookEvent,
-  type WebhookEventType,
   type WebhookMessageData,
   type WebhookMessageStatus,
 } from "./utils/webhooks";

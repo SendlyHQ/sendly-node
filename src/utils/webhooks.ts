@@ -5,19 +5,14 @@
  */
 
 import * as crypto from "node:crypto";
+import type { WebhookEventType } from "../types";
+
+// Re-export for backwards compatibility
+export type { WebhookEventType };
 
 // ============================================================================
 // Types - Aligned with server's shared/webhook-types.ts
 // ============================================================================
-
-/**
- * Webhook event types
- */
-export type WebhookEventType =
-  | "message.sent"
-  | "message.delivered"
-  | "message.failed"
-  | "message.bounced";
 
 /**
  * Message status in webhook events
