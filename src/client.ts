@@ -6,6 +6,8 @@
 import type { SendlyConfig, RateLimitInfo } from "./types";
 import { HttpClient } from "./utils/http";
 import { MessagesResource } from "./resources/messages";
+import { WebhooksResource } from "./resources/webhooks";
+import { AccountResource } from "./resources/account";
 
 const DEFAULT_BASE_URL = "https://sendly.live/api/v1";
 const DEFAULT_TIMEOUT = 30000;
@@ -60,6 +62,43 @@ export class Sendly {
    */
   public readonly messages: MessagesResource;
 
+  /**
+   * Webhooks API resource
+   *
+   * @example
+   * ```typescript
+   * // Create a webhook
+   * const webhook = await sendly.webhooks.create({
+   *   url: 'https://example.com/webhooks',
+   *   events: ['message.delivered', 'message.failed']
+   * });
+   *
+   * // List webhooks
+   * const webhooks = await sendly.webhooks.list();
+   *
+   * // Test a webhook
+   * await sendly.webhooks.test('whk_xxx');
+   * ```
+   */
+  public readonly webhooks: WebhooksResource;
+
+  /**
+   * Account API resource
+   *
+   * @example
+   * ```typescript
+   * // Get credit balance
+   * const credits = await sendly.account.getCredits();
+   *
+   * // Get transaction history
+   * const transactions = await sendly.account.getCreditTransactions();
+   *
+   * // List API keys
+   * const keys = await sendly.account.listApiKeys();
+   * ```
+   */
+  public readonly account: AccountResource;
+
   private readonly http: HttpClient;
   private readonly config: Required<SendlyConfig>;
 
@@ -96,6 +135,8 @@ export class Sendly {
 
     // Initialize resources
     this.messages = new MessagesResource(this.http);
+    this.webhooks = new WebhooksResource(this.http);
+    this.account = new AccountResource(this.http);
   }
 
   /**

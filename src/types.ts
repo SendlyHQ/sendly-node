@@ -63,13 +63,14 @@ export interface SendMessageRequest {
 
 /**
  * Message status values
+ * Note: "sending" was removed as it doesn't exist in the database
  */
-export type MessageStatus =
-  | "queued"
-  | "sending"
-  | "sent"
-  | "delivered"
-  | "failed";
+export type MessageStatus = "queued" | "sent" | "delivered" | "failed";
+
+/**
+ * How the message was sent
+ */
+export type SenderType = "number_pool" | "alphanumeric" | "sandbox";
 
 /**
  * A sent or received SMS message
@@ -101,6 +102,11 @@ export interface Message {
   status: MessageStatus;
 
   /**
+   * Message direction
+   */
+  direction: "outbound" | "inbound";
+
+  /**
    * Error message if status is "failed"
    */
   error?: string | null;
@@ -119,6 +125,29 @@ export interface Message {
    * Whether this message was sent in sandbox mode
    */
   isSandbox: boolean;
+
+  /**
+   * How the message was sent
+   * - "number_pool": Sent from toll-free number pool (US/CA)
+   * - "alphanumeric": Sent with alphanumeric sender ID (international)
+   * - "sandbox": Sent in sandbox/test mode
+   */
+  senderType?: SenderType;
+
+  /**
+   * Telnyx message ID for tracking
+   */
+  telnyxMessageId?: string | null;
+
+  /**
+   * Warning message (e.g., when "from" is ignored for domestic messages)
+   */
+  warning?: string;
+
+  /**
+   * Note about sender behavior (e.g., toll-free number pool explanation)
+   */
+  senderNote?: string;
 
   /**
    * ISO 8601 timestamp when the message was created
@@ -686,6 +715,245 @@ export const SUPPORTED_COUNTRIES: Record<PricingTier, string[]> = {
  */
 export const ALL_SUPPORTED_COUNTRIES: string[] =
   Object.values(SUPPORTED_COUNTRIES).flat();
+
+// ============================================================================
+// Webhooks
+// ============================================================================
+
+/**
+ * Webhook event types
+ */
+export type WebhookEventType =
+  | "message.sent"
+  | "message.delivered"
+  | "message.failed"
+  | "message.bounced";
+
+/**
+ * Circuit breaker state for webhook delivery
+ */
+export type CircuitState = "closed" | "open" | "half_open";
+
+/**
+ * Webhook delivery status
+ */
+export type DeliveryStatus = "pending" | "delivered" | "failed" | "cancelled";
+
+/**
+ * A configured webhook endpoint
+ */
+export interface Webhook {
+  /** Unique webhook identifier (whk_xxx) */
+  id: string;
+  /** HTTPS endpoint URL */
+  url: string;
+  /** Event types this webhook subscribes to */
+  events: WebhookEventType[];
+  /** Optional description */
+  description?: string;
+  /** Whether the webhook is active */
+  isActive: boolean;
+  /** Number of consecutive failures */
+  failureCount: number;
+  /** Last failure timestamp (ISO 8601) */
+  lastFailureAt?: string | null;
+  /** Circuit breaker state */
+  circuitState: CircuitState;
+  /** When circuit was opened (ISO 8601) */
+  circuitOpenedAt?: string | null;
+  /** API version for payloads */
+  apiVersion: string;
+  /** Custom metadata */
+  metadata: Record<string, unknown>;
+  /** When webhook was created (ISO 8601) */
+  createdAt: string;
+  /** When webhook was last updated (ISO 8601) */
+  updatedAt: string;
+  /** Total delivery attempts */
+  totalDeliveries: number;
+  /** Successful deliveries */
+  successfulDeliveries: number;
+  /** Success rate (0-100) */
+  successRate: number;
+  /** Last successful delivery (ISO 8601) */
+  lastDeliveryAt?: string | null;
+}
+
+/**
+ * Response when creating a webhook (includes secret once)
+ */
+export interface WebhookCreatedResponse extends Webhook {
+  /** Webhook signing secret - only shown once at creation */
+  secret: string;
+}
+
+/**
+ * Options for creating a webhook
+ */
+export interface CreateWebhookOptions {
+  /** HTTPS endpoint URL */
+  url: string;
+  /** Event types to subscribe to */
+  events: WebhookEventType[];
+  /** Optional description */
+  description?: string;
+  /** Custom metadata */
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Options for updating a webhook
+ */
+export interface UpdateWebhookOptions {
+  /** New URL */
+  url?: string;
+  /** New event subscriptions */
+  events?: WebhookEventType[];
+  /** New description */
+  description?: string;
+  /** Enable/disable webhook */
+  isActive?: boolean;
+  /** Custom metadata */
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * A webhook delivery attempt
+ */
+export interface WebhookDelivery {
+  /** Unique delivery identifier (del_xxx) */
+  id: string;
+  /** Webhook ID this delivery belongs to */
+  webhookId: string;
+  /** Event ID for idempotency */
+  eventId: string;
+  /** Event type */
+  eventType: WebhookEventType;
+  /** Attempt number (1-6) */
+  attemptNumber: number;
+  /** Maximum attempts allowed */
+  maxAttempts: number;
+  /** Delivery status */
+  status: DeliveryStatus;
+  /** HTTP response status code */
+  responseStatusCode?: number;
+  /** Response time in milliseconds */
+  responseTimeMs?: number;
+  /** Error message if failed */
+  errorMessage?: string;
+  /** Error code if failed */
+  errorCode?: string;
+  /** Next retry time (ISO 8601) */
+  nextRetryAt?: string;
+  /** When delivery was created (ISO 8601) */
+  createdAt: string;
+  /** When delivery succeeded (ISO 8601) */
+  deliveredAt?: string;
+}
+
+/**
+ * Response from testing a webhook
+ */
+export interface WebhookTestResult {
+  /** Whether test was successful */
+  success: boolean;
+  /** HTTP status code from endpoint */
+  statusCode?: number;
+  /** Response time in milliseconds */
+  responseTimeMs?: number;
+  /** Error message if failed */
+  error?: string;
+}
+
+/**
+ * Response from rotating webhook secret
+ */
+export interface WebhookSecretRotation {
+  /** The webhook */
+  webhook: Webhook;
+  /** New signing secret */
+  newSecret: string;
+  /** When old secret expires (ISO 8601) */
+  oldSecretExpiresAt: string;
+  /** Message about grace period */
+  message: string;
+}
+
+// ============================================================================
+// Account & Credits
+// ============================================================================
+
+/**
+ * Account information
+ */
+export interface Account {
+  /** User ID */
+  id: string;
+  /** Email address */
+  email: string;
+  /** Display name */
+  name?: string;
+  /** Account creation date (ISO 8601) */
+  createdAt: string;
+}
+
+/**
+ * Credit balance information
+ */
+export interface Credits {
+  /** Available credit balance */
+  balance: number;
+  /** Credits reserved for scheduled messages */
+  reservedBalance: number;
+  /** Total usable credits (balance - reserved) */
+  availableBalance: number;
+}
+
+/**
+ * A credit transaction record
+ */
+export interface CreditTransaction {
+  /** Transaction ID */
+  id: string;
+  /** Transaction type */
+  type: "purchase" | "usage" | "refund" | "adjustment" | "bonus";
+  /** Amount (positive for credits in, negative for credits out) */
+  amount: number;
+  /** Balance after transaction */
+  balanceAfter: number;
+  /** Transaction description */
+  description: string;
+  /** Related message ID (for usage transactions) */
+  messageId?: string;
+  /** When transaction occurred (ISO 8601) */
+  createdAt: string;
+}
+
+/**
+ * An API key
+ */
+export interface ApiKey {
+  /** Key ID */
+  id: string;
+  /** Key name/label */
+  name: string;
+  /** Key type */
+  type: "test" | "live";
+  /** Key prefix (for identification) */
+  prefix: string;
+  /** Last 4 characters of key */
+  lastFour: string;
+  /** Permissions granted */
+  permissions: string[];
+  /** When key was created (ISO 8601) */
+  createdAt: string;
+  /** When key was last used (ISO 8601) */
+  lastUsedAt?: string | null;
+  /** When key expires (ISO 8601) */
+  expiresAt?: string | null;
+  /** Whether key is revoked */
+  isRevoked: boolean;
+}
 
 // ============================================================================
 // Sandbox

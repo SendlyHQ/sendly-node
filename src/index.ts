@@ -24,19 +24,50 @@
 // Main client
 export { Sendly, Sendly as default } from "./client";
 
-// Types
+// Types - Messages
 export type {
   SendlyConfig,
   SendMessageRequest,
   Message,
   MessageStatus,
+  SenderType,
   ListMessagesOptions,
   MessageListResponse,
+  ScheduleMessageRequest,
+  ScheduledMessage,
+  ScheduledMessageStatus,
+  ListScheduledMessagesOptions,
+  ScheduledMessageListResponse,
+  CancelledMessageResponse,
+  BatchMessageItem,
+  BatchMessageRequest,
+  BatchMessageResult,
+  BatchStatus,
+  BatchMessageResponse,
+  ListBatchesOptions,
+  BatchListResponse,
   ApiErrorResponse,
   SendlyErrorCode,
   RateLimitInfo,
   PricingTier,
 } from "./types";
+
+// Types - Webhooks
+export type {
+  WebhookEventType,
+  CircuitState,
+  DeliveryStatus,
+  Webhook,
+  WebhookCreatedResponse,
+  CreateWebhookOptions,
+  UpdateWebhookOptions,
+  WebhookDelivery,
+  WebhookTestResult,
+  WebhookSecretRotation,
+} from "./types";
+
+// Types - Account & Credits
+export type { Account, Credits, CreditTransaction, ApiKey } from "./types";
 
 // Constants
 export {

@@ -7,69 +7,117 @@
 import * as crypto from "node:crypto";
 
 // ============================================================================
-// Types
+// Types - Aligned with server's shared/webhook-types.ts
 // ============================================================================
 
 /**
  * Webhook event types
  */
 export type WebhookEventType =
-  | "message.queued"
   | "message.sent"
   | "message.delivered"
   | "message.failed"
-  | "message.undelivered";
+  | "message.bounced";
 
 /**
  * Message status in webhook events
  */
-export type WebhookMessageStatus =
-  | "queued"
-  | "sent"
-  | "delivered"
-  | "failed"
-  | "undelivered";
+export type WebhookMessageStatus = "queued" | "sent" | "delivered" | "failed";
 
 /**
- * Webhook message data payload
+ * Message object within webhook payload
+ * Matches the structure sent by Sendly servers
  */
-export interface WebhookMessageData {
-  /** Unique message identifier */
-  messageId: string;
+export interface WebhookMessageObject {
+  /** Message ID (msg_xxx) */
+  id: string;
+  /** Recipient phone number (E.164 format) */
+  to: string;
+  /** Sender phone number or ID */
+  from: string;
+  /** Message text content */
+  text: string;
   /** Current message status */
   status: WebhookMessageStatus;
-  /** Destination phone number */
-  to: string;
-  /** Sender ID or phone number */
-  from: string;
-  /** Error message if failed */
-  error?: string;
-  /** Error code if failed */
-  errorCode?: string;
-  /** ISO 8601 timestamp when delivered */
-  deliveredAt?: string;
-  /** ISO 8601 timestamp when failed */
-  failedAt?: string;
+  /** Message direction */
+  direction: "outbound" | "inbound";
   /** Number of SMS segments */
   segments: number;
-  /** Credits charged */
-  creditsUsed: number;
+  /** Credits charged for this message */
+  credits_used: number;
+  /** Unix timestamp when message was created */
+  created_at: number;
+  /** Unix timestamp when message was delivered (if applicable) */
+  delivered_at?: number;
+  /** Error message if status is 'failed' */
+  error?: string;
+  /** Custom metadata attached to the message */
+  metadata?: Record<string, unknown>;
 }
 
 /**
- * Webhook event structure
+ * Webhook event payload from Sendly
+ * This is the exact structure sent to your webhook endpoints
+ *
+ * @example
+ * ```json
+ * {
+ *   "id": "evt_abc123",
+ *   "type": "message.delivered",
+ *   "api_version": "2024-01",
+ *   "created": 1702000000,
+ *   "livemode": true,
+ *   "data": {
+ *     "object": {
+ *       "id": "msg_xyz789",
+ *       "to": "+15551234567",
+ *       "from": "+15559876543",
+ *       "text": "Hello!",
+ *       "status": "delivered",
+ *       "direction": "outbound",
+ *       "segments": 1,
+ *       "credits_used": 1,
+ *       "created_at": 1702000000,
+ *       "delivered_at": 1702000005
+ *     }
+ *   }
+ * }
+ * ```
  */
 export interface WebhookEvent {
-  /** Unique event identifier */
+  /** Unique event identifier (evt_xxx) for idempotency */
   id: string;
   /** Event type */
   type: WebhookEventType;
-  /** Event data payload */
-  data: WebhookMessageData;
-  /** ISO 8601 timestamp when event was created */
-  createdAt: string;
   /** API version that generated this event */
-  apiVersion: string;
+  api_version: string;
+  /** Unix timestamp (seconds) when event was created */
+  created: number;
+  /** Whether this event is from live mode (true) or sandbox (false) */
+  livemode: boolean;
+  /** Event data containing the message object */
+  data: {
+    /** The message object that triggered this event */
+    object: WebhookMessageObject;
+  };
+}
+
+/**
+ * Webhook test event payload
+ */
+export interface WebhookTestEvent {
+  id: string;
+  type: "webhook.test";
+  api_version: string;
+  created: number;
+  livemode: false;
+  data: {
+    object: {
+      webhook_id: string;
+      message: string;
+      timestamp: number;
+    };
+  };
 }
 
 /**
@@ -83,25 +131,41 @@ export class WebhookSignatureError extends Error {
 }
 
 // ============================================================================
-// Webhook Utilities
+// Webhook Signature Utilities
 // ============================================================================
 
 /**
  * Verify a webhook signature from Sendly
  *
- * @param payload - Raw request body as string
+ * Sendly signs webhooks using HMAC-SHA256. The signature format is:
+ * `sha256=<hex_digest>`
+ *
+ * The signed payload is: `<timestamp>.<json_body>`
+ *
+ * @param payload - Raw request body as string (JSON)
  * @param signature - X-Sendly-Signature header value
  * @param secret - Your webhook secret from dashboard
+ * @param timestamp - X-Sendly-Timestamp header value (optional, for enhanced verification)
+ * @param toleranceSeconds - Maximum age of webhook in seconds (default: 300 = 5 minutes)
  * @returns true if signature is valid
  *
  * @example
  * ```typescript
  * import { verifyWebhookSignature } from '@sendly/node';
  *
+ * // Basic verification
  * const isValid = verifyWebhookSignature(
  *   req.body, // raw body string
  *   req.headers['x-sendly-signature'],
  *   process.env.WEBHOOK_SECRET
+ * );
+ *
+ * // With timestamp verification (recommended)
+ * const isValid = verifyWebhookSignature(
+ *   req.body,
+ *   req.headers['x-sendly-signature'],
+ *   process.env.WEBHOOK_SECRET,
+ *   req.headers['x-sendly-timestamp']
  * );
  *
  * if (!isValid) {
@@ -112,19 +176,37 @@ export class WebhookSignatureError extends Error {
 export function verifyWebhookSignature(
   payload: string,
   signature: string,
-  secret: string
+  secret: string,
+  timestamp?: string,
+  toleranceSeconds: number = 300,
 ): boolean {
   if (!payload || !signature || !secret) {
     return false;
   }
 
-  const expectedSignature = generateWebhookSignature(payload, secret);
+  // If timestamp provided, verify it's within tolerance
+  if (timestamp) {
+    const timestampNum = parseInt(timestamp, 10);
+    if (isNaN(timestampNum)) {
+      return false;
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    if (Math.abs(now - timestampNum) > toleranceSeconds) {
+      return false; // Timestamp too old or in future
+    }
+  }
+
+  // Generate expected signature
+  // Sendly signs: timestamp.payload (if timestamp provided) or just payload
+  const signedPayload = timestamp ? `${timestamp}.${payload}` : payload;
+  const expectedSignature = generateWebhookSignature(signedPayload, secret);
 
   // Timing-safe comparison to prevent timing attacks
   try {
     return crypto.timingSafeEqual(
       Buffer.from(signature),
-      Buffer.from(expectedSignature)
+      Buffer.from(expectedSignature),
     );
   } catch {
     // Lengths don't match
@@ -138,6 +220,7 @@ export function verifyWebhookSignature(
  * @param payload - Raw request body as string
  * @param signature - X-Sendly-Signature header value
  * @param secret - Your webhook secret from dashboard
+ * @param timestamp - X-Sendly-Timestamp header value (optional)
  * @returns Parsed webhook event
  * @throws {WebhookSignatureError} If signature is invalid
  *
@@ -149,15 +232,16 @@ export function verifyWebhookSignature(
  *   const event = parseWebhookEvent(
  *     req.body,
  *     req.headers['x-sendly-signature'],
- *     process.env.WEBHOOK_SECRET
+ *     process.env.WEBHOOK_SECRET,
+ *     req.headers['x-sendly-timestamp']
  *   );
  *
  *   switch (event.type) {
  *     case 'message.delivered':
- *       console.log(`Message ${event.data.messageId} delivered!`);
+ *       console.log(`Message ${event.data.object.id} delivered!`);
  *       break;
  *     case 'message.failed':
- *       console.log(`Message failed: ${event.data.error}`);
+ *       console.log(`Message failed: ${event.data.object.error}`);
  *       break;
  *   }
  * } catch (err) {
@@ -171,9 +255,10 @@ export function verifyWebhookSignature(
 export function parseWebhookEvent(
   payload: string,
   signature: string,
-  secret: string
+  secret: string,
+  timestamp?: string,
 ): WebhookEvent {
-  if (!verifyWebhookSignature(payload, signature, secret)) {
+  if (!verifyWebhookSignature(payload, signature, secret, timestamp)) {
     throw new WebhookSignatureError();
   }
 
@@ -185,7 +270,7 @@ export function parseWebhookEvent(
   }
 
   // Basic validation
-  if (!event.id || !event.type || !event.createdAt) {
+  if (!event.id || !event.type || !event.created || !event.data?.object) {
     throw new Error("Invalid webhook event structure");
   }
 
@@ -204,20 +289,36 @@ export function parseWebhookEvent(
  * import { generateWebhookSignature } from '@sendly/node';
  *
  * // For testing your webhook handler
+ * const timestamp = Math.floor(Date.now() / 1000);
  * const testPayload = JSON.stringify({
  *   id: 'evt_test',
  *   type: 'message.delivered',
- *   data: { messageId: 'msg_123', status: 'delivered' },
- *   createdAt: new Date().toISOString(),
- *   apiVersion: '2025-01-01'
+ *   api_version: '2024-01',
+ *   created: timestamp,
+ *   livemode: false,
+ *   data: {
+ *     object: {
+ *       id: 'msg_123',
+ *       to: '+15551234567',
+ *       from: '+15559876543',
+ *       text: 'Test message',
+ *       status: 'delivered',
+ *       direction: 'outbound',
+ *       segments: 1,
+ *       credits_used: 1,
+ *       created_at: timestamp,
+ *       delivered_at: timestamp
+ *     }
+ *   }
  * });
  *
- * const signature = generateWebhookSignature(testPayload, 'test_secret');
+ * const signedPayload = `${timestamp}.${testPayload}`;
+ * const signature = generateWebhookSignature(signedPayload, 'test_secret');
  * ```
  */
 export function generateWebhookSignature(
   payload: string,
-  secret: string
+  secret: string,
 ): string {
   const hmac = crypto.createHmac("sha256", secret);
   hmac.update(payload);
@@ -233,11 +334,25 @@ export function generateWebhookSignature(
  *
  * const webhooks = new Webhooks('your_webhook_secret');
  *
- * // Verify signature
- * const isValid = webhooks.verify(payload, signature);
+ * // In your Express/Fastify/etc handler:
+ * app.post('/webhooks/sendly', (req, res) => {
+ *   try {
+ *     const event = webhooks.parse(
+ *       req.body,
+ *       req.headers['x-sendly-signature'],
+ *       req.headers['x-sendly-timestamp']
+ *     );
  *
- * // Parse event
- * const event = webhooks.parse(payload, signature);
+ *     // Handle the event
+ *     if (event.type === 'message.delivered') {
+ *       console.log(`Message ${event.data.object.id} delivered!`);
+ *     }
+ *
+ *     res.status(200).send('OK');
+ *   } catch (err) {
+ *     res.status(401).send('Invalid signature');
+ *   }
+ * });
  * ```
  */
 export class Webhooks {
@@ -258,25 +373,37 @@ export class Webhooks {
    * Verify a webhook signature
    * @param payload - Raw request body
    * @param signature - X-Sendly-Signature header
+   * @param timestamp - X-Sendly-Timestamp header (optional)
    */
-  verify(payload: string, signature: string): boolean {
-    return verifyWebhookSignature(payload, signature, this.secret);
+  verify(payload: string, signature: string, timestamp?: string): boolean {
+    return verifyWebhookSignature(payload, signature, this.secret, timestamp);
   }
 
   /**
    * Parse and verify a webhook event
    * @param payload - Raw request body
    * @param signature - X-Sendly-Signature header
+   * @param timestamp - X-Sendly-Timestamp header (optional)
    */
-  parse(payload: string, signature: string): WebhookEvent {
-    return parseWebhookEvent(payload, signature, this.secret);
+  parse(payload: string, signature: string, timestamp?: string): WebhookEvent {
+    return parseWebhookEvent(payload, signature, this.secret, timestamp);
   }
 
   /**
    * Generate a signature for testing
-   * @param payload - Payload to sign
+   * @param payload - Payload to sign (should include timestamp prefix if using timestamps)
    */
   sign(payload: string): string {
     return generateWebhookSignature(payload, this.secret);
   }
 }
+
+// ============================================================================
+// Legacy exports for backwards compatibility
+// These types match the old naming but point to the correct structure
+// ============================================================================
+
+/**
+ * @deprecated Use WebhookMessageObject instead
+ */
+export type WebhookMessageData = WebhookMessageObject;
