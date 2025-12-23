@@ -84,6 +84,7 @@ export class WebhooksResource {
         url: options.url,
         events: options.events,
         ...(options.description && { description: options.description }),
+        ...(options.mode && { mode: options.mode }),
         ...(options.metadata && { metadata: options.metadata }),
       },
     });
@@ -186,6 +187,7 @@ export class WebhooksResource {
           description: options.description,
         }),
         ...(options.isActive !== undefined && { is_active: options.isActive }),
+        ...(options.mode !== undefined && { mode: options.mode }),
         ...(options.metadata !== undefined && { metadata: options.metadata }),
       },
     });

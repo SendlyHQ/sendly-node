@@ -731,6 +731,14 @@ export type WebhookEventType =
   | "message.queued";
 
 /**
+ * Webhook mode - filters which events are delivered
+ * - "all": Receives all events (sandbox + production)
+ * - "test": Only sandbox/test events (livemode: false)
+ * - "live": Only production events (livemode: true) - requires verification
+ */
+export type WebhookMode = "all" | "test" | "live";
+
+/**
  * Webhook event data (legacy flat format for backwards compatibility)
  */
 export interface WebhookEventData {
@@ -794,6 +802,8 @@ export interface Webhook {
   events: WebhookEventType[];
   /** Optional description */
   description?: string;
+  /** Event mode filter */
+  mode: WebhookMode;
   /** Whether the webhook is active */
   isActive: boolean;
   /** Number of consecutive failures */
@@ -840,6 +850,8 @@ export interface CreateWebhookOptions {
   events: WebhookEventType[];
   /** Optional description */
   description?: string;
+  /** Event mode filter (defaults to "all") */
+  mode?: WebhookMode;
   /** Custom metadata */
   metadata?: Record<string, unknown>;
 }
@@ -854,6 +866,8 @@ export interface UpdateWebhookOptions {
   events?: WebhookEventType[];
   /** New description */
   description?: string;
+  /** Event mode filter */
+  mode?: WebhookMode;
   /** Enable/disable webhook */
   isActive?: boolean;
   /** Custom metadata */

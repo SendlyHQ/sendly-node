@@ -1,5 +1,25 @@
 # @sendly/node
 
+## 3.1.0
+
+### Minor Changes
+
+- Add webhook mode filtering support
+
+  **Node SDK:**
+  - Added `WebhookMode` type (`'all' | 'test' | 'live'`)
+  - Added `mode` parameter to `CreateWebhookOptions` and `UpdateWebhookOptions`
+  - Added `mode` property to `Webhook` type
+  - Webhooks can now filter events by mode:
+    - `all`: Receive all events (default)
+    - `test`: Receive only sandbox/test events
+    - `live`: Receive only production events (requires business verification)
+
+  **CLI:**
+  - Added `--mode` flag to `sendly webhooks create` command
+  - Added `--mode` flag to `sendly webhooks update` command
+  - Mode is now displayed in `sendly webhooks list` and `sendly webhooks get` output
+
 ## 3.0.0
 
 ### Patch Changes
