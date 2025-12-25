@@ -1,5 +1,61 @@
 # @sendly/node
 
+## 3.4.0
+
+### Minor Changes
+
+- feat: Add messageType parameter for SMS compliance
+
+  All SDKs now support `messageType` parameter for SMS compliance handling:
+  - **Marketing** (default): Subject to quiet hours restrictions (8am-9pm recipient local time)
+  - **Transactional**: 24/7 delivery for OTPs, order confirmations, appointment reminders
+
+  ### API Changes
+
+  **Send Message:**
+
+  ```javascript
+  // Node.js
+  await sendly.messages.send('+1234567890', 'Your code is 123456', { messageType: 'transactional' });
+
+  // CLI
+  sendly sms send --to +1234567890 --text "Your code is 123456" --type transactional
+  ```
+
+  **Batch Send:**
+
+  ```javascript
+  await sendly.messages.sendBatch(["+1...", "+2..."], "Sale!", {
+    messageType: "marketing",
+  });
+  ```
+
+  **Schedule:**
+
+  ```javascript
+  await sendly.messages.schedule("+1234567890", "Reminder", new Date(), {
+    messageType: "transactional",
+  });
+  ```
+
+  ### SDK Updates
+
+  All 8 SDKs updated with `messageType` support:
+  - Node.js: `messageType` option in send/batch/schedule
+  - Python: `message_type` parameter
+  - Ruby: `message_type:` keyword argument
+  - Go: `MessageType` field in request structs
+  - PHP: `$messageType` parameter
+  - Java: `messageType()` builder method
+  - .NET: `MessageType` property
+  - Rust: `message_type` field with `MessageType` enum
+
+  ### Compliance Features
+  - SHAFT content filtering (Sex, Hate, Alcohol, Firearms, Tobacco/Cannabis)
+  - Quiet hours enforcement for 48 countries with timezone detection
+  - US state-specific rules (FL, OK, WA, CT have stricter hours)
+  - Automatic rescheduling option for quiet hours violations
+
 ## 3.1.0
 
 ### Minor Changes

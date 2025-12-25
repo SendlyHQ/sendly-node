@@ -40,6 +40,11 @@ export interface SendlyConfig {
 // ============================================================================
 
 /**
+ * Message type for compliance classification
+ */
+export type MessageType = "marketing" | "transactional";
+
+/**
  * Request payload for sending an SMS message
  */
 export interface SendMessageRequest {
@@ -59,6 +64,13 @@ export interface SendMessageRequest {
    * For US/Canada: Your verified toll-free number
    */
   from?: string;
+
+  /**
+   * Message type for compliance (default: "marketing")
+   * - "marketing": Promotional content, subject to quiet hours (8am-9pm recipient time)
+   * - "transactional": OTPs, confirmations, alerts - bypasses quiet hours (24/7)
+   */
+  messageType?: MessageType;
 }
 
 /**
@@ -225,6 +237,13 @@ export interface ScheduleMessageRequest {
    * For US/Canada: This is ignored - toll-free number pool is used
    */
   from?: string;
+
+  /**
+   * Message type for compliance (default: "marketing")
+   * - "marketing": Promotional content, subject to quiet hours (8am-9pm recipient time)
+   * - "transactional": OTPs, confirmations, alerts - bypasses quiet hours (24/7)
+   */
+  messageType?: MessageType;
 }
 
 /**
@@ -391,6 +410,13 @@ export interface BatchMessageRequest {
    * For US/Canada destinations: This is ignored - toll-free number pool is used
    */
   from?: string;
+
+  /**
+   * Message type for compliance (default: "marketing")
+   * - "marketing": Promotional content, subject to quiet hours (8am-9pm recipient time)
+   * - "transactional": OTPs, confirmations, alerts - bypasses quiet hours (24/7)
+   */
+  messageType?: MessageType;
 }
 
 /**

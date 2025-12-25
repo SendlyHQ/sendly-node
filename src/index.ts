@@ -30,6 +30,7 @@ export type {
   SendMessageRequest,
   Message,
   MessageStatus,
+  MessageType,
   SenderType,
   ListMessagesOptions,
   MessageListResponse,
