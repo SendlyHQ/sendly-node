@@ -28,7 +28,7 @@ export class SendlyError extends Error {
     message: string,
     code: SendlyErrorCode,
     statusCode?: number,
-    response?: ApiErrorResponse
+    response?: ApiErrorResponse,
   ) {
     super(message);
     this.name = "SendlyError";
@@ -47,7 +47,7 @@ export class SendlyError extends Error {
    */
   static fromResponse(
     statusCode: number,
-    response: ApiErrorResponse
+    response: ApiErrorResponse,
   ): SendlyError {
     const message = response.message || "An unknown error occurred";
     const code = response.error || "internal_error";
@@ -58,6 +58,7 @@ export class SendlyError extends Error {
       case "invalid_auth_format":
       case "invalid_key_format":
       case "invalid_api_key":
+      case "api_key_required":
       case "key_revoked":
       case "key_expired":
       case "insufficient_permissions":
@@ -68,7 +69,7 @@ export class SendlyError extends Error {
           message,
           response.retryAfter || 60,
           statusCode,
-          response
+          response,
         );
 
       case "insufficient_credits":
@@ -77,7 +78,7 @@ export class SendlyError extends Error {
           response.creditsNeeded || 0,
           response.currentBalance || 0,
           statusCode,
-          response
+          response,
         );
 
       case "invalid_request":
@@ -101,7 +102,7 @@ export class AuthenticationError extends SendlyError {
     message: string,
     code: SendlyErrorCode = "unauthorized",
     statusCode?: number,
-    response?: ApiErrorResponse
+    response?: ApiErrorResponse,
   ) {
     super(message, code, statusCode, response);
     this.name = "AuthenticationError";
@@ -121,7 +122,7 @@ export class RateLimitError extends SendlyError {
     message: string,
     retryAfter: number,
     statusCode?: number,
-    response?: ApiErrorResponse
+    response?: ApiErrorResponse,
   ) {
     super(message, "rate_limit_exceeded", statusCode, response);
     this.name = "RateLimitError";
@@ -148,7 +149,7 @@ export class InsufficientCreditsError extends SendlyError {
     creditsNeeded: number,
     currentBalance: number,
     statusCode?: number,
-    response?: ApiErrorResponse
+    response?: ApiErrorResponse,
   ) {
     super(message, "insufficient_credits", statusCode, response);
     this.name = "InsufficientCreditsError";
@@ -165,7 +166,7 @@ export class ValidationError extends SendlyError {
     message: string,
     code: SendlyErrorCode = "invalid_request",
     statusCode?: number,
-    response?: ApiErrorResponse
+    response?: ApiErrorResponse,
   ) {
     super(message, code, statusCode, response);
     this.name = "ValidationError";
@@ -179,7 +180,7 @@ export class NotFoundError extends SendlyError {
   constructor(
     message: string,
     statusCode?: number,
-    response?: ApiErrorResponse
+    response?: ApiErrorResponse,
   ) {
     super(message, "not_found", statusCode, response);
     this.name = "NotFoundError";
