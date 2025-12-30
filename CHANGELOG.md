@@ -1,5 +1,35 @@
 # @sendly/node
 
+## 3.5.3
+
+### Patch Changes
+
+- [`19bad0a`](https://github.com/sendly-live/sendly/commit/19bad0a44fef3ebbffe1478cd3c736d5e845cd1d) - ## Documentation Improvements
+
+  ### New: Going Live Guide
+  - Added `/docs/going-live` page with step-by-step verification flow
+  - Explains International (instant) vs US/Canada (toll-free) vs Global options
+  - Documents why live keys require credits
+
+  ### CLI Environment Switching
+  - Added `sendly config set environment live/test` documentation
+  - Replaces confusing `testMode true/false` with clearer environment switching
+
+  ### Sandbox Testing
+  - Unified all sandbox test numbers to `+1500555xxxx` pattern
+  - Added missing `+15005550006` (carrier violation) to docs
+  - Fixed descriptions: "Queue full error" for `+15005550003`
+
+  ### API Reference
+  - Fixed endpoint paths: `/api/messages` → `/api/v1/messages`
+  - Added Sender ID logic explanation (international vs US/CA behavior)
+  - Added CSV format documentation for batch messages
+
+  ### SDK READMEs
+  - All 8 SDKs updated with consistent sandbox numbers
+  - Fixed Go SDK path: `github.com/sendly-live/sendly-go`
+  - Fixed domain references: `sendly.dev` → `sendly.live`
+
 ## 3.5.2
 
 ### Patch Changes

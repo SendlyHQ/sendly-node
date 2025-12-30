@@ -1,6 +1,6 @@
 {
   "name": "@sendly/node",
-  "version": "3.5.2",
+  "version": "3.5.3",
   "description": "Official Sendly Node.js SDK for SMS messaging",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
