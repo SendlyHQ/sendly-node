@@ -77,10 +77,17 @@ import Sendly from '@sendly/node';
 
 const sendly = new Sendly('sk_live_v1_xxx');
 
-// Basic usage
+// Basic usage (marketing message - default)
 const message = await sendly.messages.send({
   to: '+15551234567',
-  text: 'Your verification code is: 123456'
+  text: 'Check out our new features!'
+});
+
+// Transactional message (bypasses quiet hours)
+const message = await sendly.messages.send({
+  to: '+15551234567',
+  text: 'Your verification code is: 123456',
+  messageType: 'transactional'
 });
 
 // With custom sender ID (international)
@@ -201,12 +208,12 @@ console.log(sendly.isTestMode()); // true
 
 // Use sandbox test numbers
 await sendly.messages.send({
-  to: SANDBOX_TEST_NUMBERS.SUCCESS,  // +15550001234 - Always succeeds
+  to: SANDBOX_TEST_NUMBERS.SUCCESS,  // +15005550000 - Always succeeds
   text: 'Test message'
 });
 
 await sendly.messages.send({
-  to: SANDBOX_TEST_NUMBERS.INVALID,  // +15550001001 - Returns invalid_number error
+  to: SANDBOX_TEST_NUMBERS.INVALID,  // +15005550001 - Returns invalid_number error
   text: 'Test message'
 });
 ```
@@ -215,11 +222,12 @@ await sendly.messages.send({
 
 | Number | Behavior |
 |--------|----------|
-| `+15550001234` | Instant success |
-| `+15550001010` | Success after 10s delay |
-| `+15550001001` | Fails: invalid_number |
-| `+15550001002` | Fails: carrier_rejected (2s delay) |
-| `+15550001003` | Fails: rate_limit_exceeded |
+| `+15005550000` | Success (instant) |
+| `+15005550001` | Fails: invalid_number |
+| `+15005550002` | Fails: unroutable_destination |
+| `+15005550003` | Fails: queue_full |
+| `+15005550004` | Fails: rate_limit_exceeded |
+| `+15005550006` | Fails: carrier_violation |
 
 ## Pricing Tiers
 

@@ -120,7 +120,7 @@
   **Security & Protection:**
   - CLI sessions limited to test SMS numbers only
   - Strict blocking prevents duplicate onboarding attempts
-  - Test SMS sandbox (`+15550001234`, etc.) for development
+  - Test SMS sandbox (`+15005550000`, etc.) for development
   - Real SMS requires business verification and live API keys
 
   ### 🛠 Technical Implementation

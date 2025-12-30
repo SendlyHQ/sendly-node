@@ -1044,17 +1044,20 @@ export interface ApiKey {
 // ============================================================================
 
 /**
- * Test phone numbers for sandbox mode
+ * Test phone numbers for sandbox mode.
+ * Use these with test API keys (sk_test_*) to simulate different scenarios.
  */
 export const SANDBOX_TEST_NUMBERS = {
-  /** Always succeeds instantly */
-  SUCCESS: "+15550001234",
-  /** Succeeds after 10 second delay */
-  DELAYED: "+15550001010",
+  /** Always succeeds - any number not in error list succeeds */
+  SUCCESS: "+15005550000",
   /** Fails with invalid_number error */
-  INVALID: "+15550001001",
-  /** Fails with carrier_rejected error after 2 seconds */
-  REJECTED: "+15550001002",
+  INVALID: "+15005550001",
+  /** Fails with unroutable destination error */
+  UNROUTABLE: "+15005550002",
+  /** Fails with queue_full error */
+  QUEUE_FULL: "+15005550003",
   /** Fails with rate_limit_exceeded error */
-  RATE_LIMITED: "+15550001003",
+  RATE_LIMITED: "+15005550004",
+  /** Fails with carrier_violation error */
+  CARRIER_VIOLATION: "+15005550006",
 } as const;
