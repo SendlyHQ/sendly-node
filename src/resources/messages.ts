@@ -91,6 +91,7 @@ export class MessagesResource {
         to: request.to,
         text: request.text,
         ...(request.from && { from: request.from }),
+        ...(request.messageType && { messageType: request.messageType }),
       },
     });
 
@@ -280,6 +281,7 @@ export class MessagesResource {
         text: request.text,
         scheduledAt: request.scheduledAt,
         ...(request.from && { from: request.from }),
+        ...(request.messageType && { messageType: request.messageType }),
       },
     });
 
@@ -426,6 +428,7 @@ export class MessagesResource {
       body: {
         messages: request.messages,
         ...(request.from && { from: request.from }),
+        ...(request.messageType && { messageType: request.messageType }),
       },
     });
 

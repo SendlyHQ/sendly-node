@@ -122,6 +122,54 @@ console.log(`Status: ${message.status}`);
 console.log(`Delivered: ${message.deliveredAt}`);
 ```
 
+### Scheduling Messages
+
+```typescript
+// Schedule a message for future delivery
+const scheduled = await sendly.messages.schedule({
+  to: '+15551234567',
+  text: 'Your appointment is tomorrow!',
+  scheduledAt: '2025-01-15T10:00:00Z'
+});
+
+console.log(`Scheduled: ${scheduled.id}`);
+console.log(`Will send at: ${scheduled.scheduledAt}`);
+
+// List scheduled messages
+const { data: scheduledMessages } = await sendly.messages.listScheduled();
+
+// Get a specific scheduled message
+const msg = await sendly.messages.getScheduled('sched_xxx');
+
+// Cancel a scheduled message (refunds credits)
+const result = await sendly.messages.cancelScheduled('sched_xxx');
+console.log(`Refunded: ${result.creditsRefunded} credits`);
+```
+
+### Batch Messages
+
+```typescript
+// Send multiple messages in one API call (up to 1000)
+const batch = await sendly.messages.sendBatch({
+  messages: [
+    { to: '+15551234567', text: 'Hello User 1!' },
+    { to: '+15559876543', text: 'Hello User 2!' },
+    { to: '+15551112222', text: 'Hello User 3!' }
+  ]
+});
+
+console.log(`Batch ID: ${batch.batchId}`);
+console.log(`Queued: ${batch.queued}`);
+console.log(`Failed: ${batch.failed}`);
+console.log(`Credits used: ${batch.creditsUsed}`);
+
+// Get batch status
+const status = await sendly.messages.getBatch('batch_xxx');
+
+// List all batches
+const { data: batches } = await sendly.messages.listBatches();
+```
+
 ### Rate Limit Information
 
 ```typescript
@@ -152,6 +200,113 @@ const sendly = new Sendly({
   // Optional: Max retry attempts (default: 3)
   maxRetries: 5
 });
+```
+
+## Webhooks
+
+Manage webhook endpoints to receive real-time delivery status updates.
+
+```typescript
+// Create a webhook endpoint
+const webhook = await sendly.webhooks.create({
+  url: 'https://example.com/webhooks/sendly',
+  events: ['message.delivered', 'message.failed']
+});
+
+console.log(`Webhook ID: ${webhook.id}`);
+console.log(`Secret: ${webhook.secret}`); // Store this securely!
+
+// List all webhooks
+const webhooks = await sendly.webhooks.list();
+
+// Get a specific webhook
+const wh = await sendly.webhooks.get('whk_xxx');
+
+// Update a webhook
+await sendly.webhooks.update('whk_xxx', {
+  url: 'https://new-endpoint.example.com/webhook',
+  events: ['message.delivered', 'message.failed', 'message.sent']
+});
+
+// Test a webhook (sends a test event)
+const testResult = await sendly.webhooks.test('whk_xxx');
+console.log(`Test ${testResult.success ? 'passed' : 'failed'}`);
+
+// Rotate webhook secret
+const rotation = await sendly.webhooks.rotateSecret('whk_xxx');
+console.log(`New secret: ${rotation.secret}`);
+
+// View delivery history
+const deliveries = await sendly.webhooks.getDeliveries('whk_xxx');
+
+// Retry a failed delivery
+await sendly.webhooks.retryDelivery('whk_xxx', 'del_yyy');
+
+// Delete a webhook
+await sendly.webhooks.delete('whk_xxx');
+```
+
+### Verifying Webhook Signatures
+
+```typescript
+import { Webhooks } from '@sendly/node';
+
+const webhooks = new Webhooks('your_webhook_secret');
+
+// In your webhook handler
+app.post('/webhooks/sendly', (req, res) => {
+  const signature = req.headers['x-sendly-signature'];
+  const payload = req.body;
+
+  try {
+    const event = webhooks.verifyAndParse(payload, signature);
+    
+    switch (event.type) {
+      case 'message.delivered':
+        console.log(`Message ${event.data.id} delivered`);
+        break;
+      case 'message.failed':
+        console.log(`Message ${event.data.id} failed: ${event.data.errorCode}`);
+        break;
+    }
+    
+    res.status(200).send('OK');
+  } catch (error) {
+    console.error('Invalid signature');
+    res.status(400).send('Invalid signature');
+  }
+});
+```
+
+## Account & Credits
+
+```typescript
+// Get account information
+const account = await sendly.account.get();
+console.log(`Email: ${account.email}`);
+
+// Check credit balance
+const credits = await sendly.account.getCredits();
+console.log(`Available: ${credits.availableBalance} credits`);
+console.log(`Reserved (scheduled): ${credits.reservedBalance} credits`);
+console.log(`Total: ${credits.balance} credits`);
+
+// View credit transaction history
+const { data: transactions } = await sendly.account.getCreditTransactions();
+for (const tx of transactions) {
+  console.log(`${tx.type}: ${tx.amount} credits - ${tx.description}`);
+}
+
+// List API keys
+const { data: keys } = await sendly.account.listApiKeys();
+for (const key of keys) {
+  console.log(`${key.name}: ${key.prefix}*** (${key.type})`);
+}
+
+// Get API key usage stats
+const usage = await sendly.account.getApiKeyUsage('key_xxx');
+console.log(`Messages sent: ${usage.messagesSent}`);
+console.log(`Credits used: ${usage.creditsUsed}`);
 ```
 
 ## Error Handling
@@ -305,6 +460,8 @@ new Sendly(config: SendlyConfig)
 #### Properties
 
 - `messages` - Messages resource
+- `webhooks` - Webhooks resource
+- `account` - Account resource
 
 #### Methods
 
@@ -325,6 +482,98 @@ List sent messages.
 #### `get(id: string): Promise<Message>`
 
 Get a specific message by ID.
+
+#### `schedule(request: ScheduleMessageRequest): Promise<ScheduledMessage>`
+
+Schedule a message for future delivery.
+
+#### `listScheduled(options?: ListScheduledMessagesOptions): Promise<ScheduledMessageListResponse>`
+
+List scheduled messages.
+
+#### `getScheduled(id: string): Promise<ScheduledMessage>`
+
+Get a scheduled message by ID.
+
+#### `cancelScheduled(id: string): Promise<CancelScheduledMessageResponse>`
+
+Cancel a scheduled message and refund credits.
+
+#### `sendBatch(request: SendBatchRequest): Promise<BatchMessageResponse>`
+
+Send multiple messages in one API call.
+
+#### `getBatch(batchId: string): Promise<BatchMessageResponse>`
+
+Get batch status by ID.
+
+#### `listBatches(options?: ListBatchesOptions): Promise<BatchListResponse>`
+
+List all batches.
+
+### `sendly.webhooks`
+
+#### `create(request: CreateWebhookRequest): Promise<Webhook>`
+
+Create a new webhook endpoint.
+
+#### `list(): Promise<Webhook[]>`
+
+List all webhooks.
+
+#### `get(id: string): Promise<Webhook>`
+
+Get a webhook by ID.
+
+#### `update(id: string, request: UpdateWebhookRequest): Promise<Webhook>`
+
+Update a webhook.
+
+#### `delete(id: string): Promise<void>`
+
+Delete a webhook.
+
+#### `test(id: string): Promise<WebhookTestResult>`
+
+Send a test event to a webhook.
+
+#### `rotateSecret(id: string): Promise<WebhookSecretRotation>`
+
+Rotate webhook secret.
+
+#### `getDeliveries(id: string): Promise<WebhookDelivery[]>`
+
+Get delivery history for a webhook.
+
+#### `retryDelivery(webhookId: string, deliveryId: string): Promise<void>`
+
+Retry a failed delivery.
+
+### `sendly.account`
+
+#### `get(): Promise<Account>`
+
+Get account information.
+
+#### `getCredits(): Promise<Credits>`
+
+Get credit balance.
+
+#### `getCreditTransactions(): Promise<CreditTransactionListResponse>`
+
+Get credit transaction history.
+
+#### `listApiKeys(): Promise<ApiKeyListResponse>`
+
+List API keys.
+
+#### `getApiKey(id: string): Promise<ApiKey>`
+
+Get an API key by ID.
+
+#### `getApiKeyUsage(id: string): Promise<ApiKeyUsage>`
+
+Get usage statistics for an API key.
 
 ## Support
 
