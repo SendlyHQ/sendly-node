@@ -1,5 +1,18 @@
 # @sendly/node
 
+## 3.8.1
+
+### Patch Changes
+
+- fix: update marketing copy and documentation
+  - Fix docs logo to use hexagon instead of lightning bolt
+  - Fix docs right panel spacing
+  - Remove misleading claims from landing page (fake metrics, inflated numbers)
+  - Remove fake download/star counts from SDKs page
+  - Fix about page - remove infrastructure provider mention
+  - Consistent country count (40+) across all pages
+  - Clarify API response time vs SMS delivery time
+
 ## 3.8.0
 
 ### Minor Changes
