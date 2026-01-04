@@ -168,6 +168,16 @@ const status = await sendly.messages.getBatch('batch_xxx');
 
 // List all batches
 const { data: batches } = await sendly.messages.listBatches();
+
+// Preview batch (dry run) - validates without sending
+const preview = await sendly.messages.previewBatch({
+  messages: [
+    { to: '+15551234567', text: 'Hello User 1!' },
+    { to: '+447700900123', text: 'Hello UK!' }
+  ]
+});
+console.log(`Total credits needed: ${preview.totalCredits}`);
+console.log(`Valid: ${preview.valid}, Invalid: ${preview.invalid}`);
 ```
 
 ### Rate Limit Information
@@ -307,6 +317,17 @@ for (const key of keys) {
 const usage = await sendly.account.getApiKeyUsage('key_xxx');
 console.log(`Messages sent: ${usage.messagesSent}`);
 console.log(`Credits used: ${usage.creditsUsed}`);
+
+// Create a new API key
+const newKey = await sendly.account.createApiKey({
+  name: 'Production Key',
+  type: 'live',
+  scopes: ['sms:send', 'sms:read']
+});
+console.log(`New key: ${newKey.key}`); // Only shown once!
+
+// Revoke an API key
+await sendly.account.revokeApiKey('key_xxx');
 ```
 
 ## Error Handling

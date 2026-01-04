@@ -16,6 +16,7 @@ import type {
   CancelledMessageResponse,
   BatchMessageRequest,
   BatchMessageResponse,
+  BatchPreviewResponse,
   ListBatchesOptions,
   BatchListResponse,
 } from "../types";
@@ -494,5 +495,65 @@ export class MessagesResource {
     });
 
     return response;
+  }
+
+  /**
+   * Preview a batch without sending (dry run)
+   *
+   * @param request - Batch request with array of messages
+   * @returns Preview showing what would happen if batch was sent
+   *
+   * @example
+   * ```typescript
+   * const preview = await sendly.messages.previewBatch({
+   *   messages: [
+   *     { to: '+15551234567', text: 'Hello User 1!' },
+   *     { to: '+15559876543', text: 'Hello User 2!' }
+   *   ]
+   * });
+   *
+   * console.log(preview.canSend);        // true/false
+   * console.log(preview.creditsNeeded);  // 2
+   * console.log(preview.hasEnoughCredits); // true/false
+   * ```
+   *
+   * @throws {ValidationError} If any message is invalid
+   */
+  async previewBatch(
+    request: BatchMessageRequest,
+  ): Promise<BatchPreviewResponse> {
+    // Validate all messages
+    if (
+      !request.messages ||
+      !Array.isArray(request.messages) ||
+      request.messages.length === 0
+    ) {
+      throw new Error("messages must be a non-empty array");
+    }
+
+    if (request.messages.length > 1000) {
+      throw new Error("Maximum 1000 messages per batch");
+    }
+
+    for (const msg of request.messages) {
+      validatePhoneNumber(msg.to);
+      validateMessageText(msg.text);
+    }
+
+    if (request.from) {
+      validateSenderId(request.from);
+    }
+
+    const preview = await this.http.request<BatchPreviewResponse>({
+      method: "POST",
+      path: "/messages/batch/preview",
+      body: {
+        messages: request.messages,
+        ...(request.from && { from: request.from }),
+        ...(request.messageType && { messageType: request.messageType }),
+      },
+    });
+
+    return preview;
   }
 }

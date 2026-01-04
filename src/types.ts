@@ -545,6 +545,91 @@ export interface BatchListResponse {
   count: number;
 }
 
+/**
+ * Preview result for a single message in a batch
+ */
+export interface BatchPreviewItem {
+  /**
+   * Destination phone number
+   */
+  to: string;
+
+  /**
+   * Whether this message will be sent
+   */
+  willSend: boolean;
+
+  /**
+   * Number of SMS segments
+   */
+  segments: number;
+
+  /**
+   * Credits required for this message
+   */
+  creditsNeeded: number;
+
+  /**
+   * Warning message (e.g., quiet hours)
+   */
+  warning?: string;
+
+  /**
+   * Block reason if willSend is false
+   */
+  blockReason?: string;
+}
+
+/**
+ * Response from previewing a batch (dry run)
+ */
+export interface BatchPreviewResponse {
+  /**
+   * Whether the batch can be sent
+   */
+  canSend: boolean;
+
+  /**
+   * Total number of messages
+   */
+  totalMessages: number;
+
+  /**
+   * Number of messages that will be sent
+   */
+  willSend: number;
+
+  /**
+   * Number of messages that will be blocked
+   */
+  blocked: number;
+
+  /**
+   * Total credits required
+   */
+  creditsNeeded: number;
+
+  /**
+   * Current credit balance
+   */
+  currentBalance: number;
+
+  /**
+   * Whether user has enough credits
+   */
+  hasEnoughCredits: boolean;
+
+  /**
+   * Per-message preview details
+   */
+  messages: BatchPreviewItem[];
+
+  /**
+   * Summary of why messages are blocked (if any)
+   */
+  blockReasons?: Record<string, number>;
+}
+
 // ============================================================================
 // Errors
 // ============================================================================

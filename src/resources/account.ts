@@ -164,9 +164,7 @@ export class AccountResource {
    * console.log(`Messages sent: ${usage.messagesSent}`);
    * ```
    */
-  async getApiKeyUsage(
-    id: string
-  ): Promise<{
+  async getApiKeyUsage(id: string): Promise<{
     keyId: string;
     messagesSent: number;
     messagesDelivered: number;
@@ -189,5 +187,61 @@ export class AccountResource {
     });
 
     return usage;
+  }
+
+  /**
+   * Create a new API key
+   *
+   * @param name - Display name for the API key
+   * @param options - Optional settings
+   * @returns The created API key with the full key value (only shown once)
+   *
+   * @example
+   * ```typescript
+   * const { apiKey, key } = await sendly.account.createApiKey('Production');
+   * console.log(`Created key: ${key}`); // Full key - save this!
+   * console.log(`Key ID: ${apiKey.id}`);
+   * ```
+   */
+  async createApiKey(
+    name: string,
+    options?: { expiresAt?: string },
+  ): Promise<{ apiKey: ApiKey; key: string }> {
+    if (!name) {
+      throw new Error("API key name is required");
+    }
+
+    const response = await this.http.request<{ apiKey: ApiKey; key: string }>({
+      method: "POST",
+      path: "/account/keys",
+      body: {
+        name,
+        ...(options?.expiresAt && { expiresAt: options.expiresAt }),
+      },
+    });
+
+    return response;
+  }
+
+  /**
+   * Revoke an API key
+   *
+   * @param id - API key ID to revoke
+   *
+   * @example
+   * ```typescript
+   * await sendly.account.revokeApiKey('key_xxx');
+   * console.log('API key revoked');
+   * ```
+   */
+  async revokeApiKey(id: string): Promise<void> {
+    if (!id) {
+      throw new Error("API key ID is required");
+    }
+
+    await this.http.request<void>({
+      method: "DELETE",
+      path: `/account/keys/${encodeURIComponent(id)}`,
+    });
   }
 }
