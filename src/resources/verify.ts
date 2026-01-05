@@ -70,7 +70,9 @@ export class VerifyResource {
    * }
    * ```
    */
-  async send(request: SendVerificationRequest): Promise<SendVerificationResponse> {
+  async send(
+    request: SendVerificationRequest,
+  ): Promise<SendVerificationResponse> {
     validatePhoneNumber(request.to);
 
     const response = await this.http.request<{
@@ -106,6 +108,44 @@ export class VerifyResource {
   }
 
   /**
+   * Resend an OTP verification code
+   *
+   * @param id - Verification ID
+   * @returns Updated verification with new expiry
+   *
+   * @example
+   * ```typescript
+   * // Resend when delivery failed or code expired
+   * const result = await sendly.verify.resend('ver_xxx');
+   * console.log('New code expires at:', result.expiresAt);
+   * ```
+   */
+  async resend(id: string): Promise<SendVerificationResponse> {
+    const response = await this.http.request<{
+      id: string;
+      status: string;
+      phone: string;
+      expires_at: string;
+      sandbox: boolean;
+      sandbox_code?: string;
+      message?: string;
+    }>({
+      method: "POST",
+      path: `/verify/${id}/resend`,
+    });
+
+    return {
+      id: response.id,
+      status: response.status as SendVerificationResponse["status"],
+      phone: response.phone,
+      expiresAt: response.expires_at,
+      sandbox: response.sandbox,
+      sandboxCode: response.sandbox_code,
+      message: response.message,
+    };
+  }
+
+  /**
    * Check/verify an OTP code
    *
    * @param id - Verification ID
@@ -125,7 +165,10 @@ export class VerifyResource {
    * }
    * ```
    */
-  async check(id: string, request: CheckVerificationRequest): Promise<CheckVerificationResponse> {
+  async check(
+    id: string,
+    request: CheckVerificationRequest,
+  ): Promise<CheckVerificationResponse> {
     const response = await this.http.request<{
       id: string;
       status: string;
@@ -183,7 +226,8 @@ export class VerifyResource {
       id: response.id,
       status: response.status as Verification["status"],
       phone: response.phone,
-      deliveryStatus: response.delivery_status as Verification["deliveryStatus"],
+      deliveryStatus:
+        response.delivery_status as Verification["deliveryStatus"],
       attempts: response.attempts,
       maxAttempts: response.max_attempts,
       expiresAt: response.expires_at,
@@ -213,7 +257,9 @@ export class VerifyResource {
    * });
    * ```
    */
-  async list(options: ListVerificationsOptions = {}): Promise<VerificationListResponse> {
+  async list(
+    options: ListVerificationsOptions = {},
+  ): Promise<VerificationListResponse> {
     const response = await this.http.request<{
       verifications: Array<{
         id: string;
