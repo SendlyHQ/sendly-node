@@ -12,8 +12,88 @@ import type {
   Verification,
   ListVerificationsOptions,
   VerificationListResponse,
+  CreateVerifySessionRequest,
+  VerifySession,
+  ValidateSessionTokenRequest,
+  ValidateSessionTokenResponse,
 } from "../types";
 import { validatePhoneNumber } from "../utils/validation";
+
+class SessionsResource {
+  private readonly http: HttpClient;
+
+  constructor(http: HttpClient) {
+    this.http = http;
+  }
+
+  async create(request: CreateVerifySessionRequest): Promise<VerifySession> {
+    const response = await this.http.request<{
+      id: string;
+      url: string;
+      status: string;
+      success_url: string;
+      cancel_url?: string;
+      brand_name?: string;
+      brand_color?: string;
+      phone?: string;
+      verification_id?: string;
+      token?: string;
+      metadata?: Record<string, unknown>;
+      expires_at: string;
+      created_at: string;
+    }>({
+      method: "POST",
+      path: "/verify/sessions",
+      body: {
+        success_url: request.successUrl,
+        ...(request.cancelUrl && { cancel_url: request.cancelUrl }),
+        ...(request.brandName && { brand_name: request.brandName }),
+        ...(request.brandColor && { brand_color: request.brandColor }),
+        ...(request.metadata && { metadata: request.metadata }),
+      },
+    });
+
+    return {
+      id: response.id,
+      url: response.url,
+      status: response.status as VerifySession["status"],
+      successUrl: response.success_url,
+      cancelUrl: response.cancel_url,
+      brandName: response.brand_name,
+      brandColor: response.brand_color,
+      phone: response.phone,
+      verificationId: response.verification_id,
+      token: response.token,
+      metadata: response.metadata,
+      expiresAt: response.expires_at,
+      createdAt: response.created_at,
+    };
+  }
+
+  async validate(
+    request: ValidateSessionTokenRequest,
+  ): Promise<ValidateSessionTokenResponse> {
+    const response = await this.http.request<{
+      valid: boolean;
+      session_id?: string;
+      phone?: string;
+      verified_at?: string;
+      metadata?: Record<string, unknown>;
+    }>({
+      method: "POST",
+      path: "/verify/sessions/validate",
+      body: { token: request.token },
+    });
+
+    return {
+      valid: response.valid,
+      sessionId: response.session_id,
+      phone: response.phone,
+      verifiedAt: response.verified_at,
+      metadata: response.metadata,
+    };
+  }
+}
 
 /**
  * Verify API resource for OTP verification
@@ -38,9 +118,11 @@ import { validatePhoneNumber } from "../utils/validation";
  */
 export class VerifyResource {
   private readonly http: HttpClient;
+  public readonly sessions: SessionsResource;
 
   constructor(http: HttpClient) {
     this.http = http;
+    this.sessions = new SessionsResource(http);
   }
 
   /**

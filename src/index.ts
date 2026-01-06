@@ -81,6 +81,11 @@ export type {
   Verification,
   ListVerificationsOptions,
   VerificationListResponse,
+  VerifySessionStatus,
+  CreateVerifySessionRequest,
+  VerifySession,
+  ValidateSessionTokenRequest,
+  ValidateSessionTokenResponse,
 } from "./types";
 
 // Types - Templates

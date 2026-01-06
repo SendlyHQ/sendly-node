@@ -1379,3 +1379,51 @@ export interface TemplatePreview {
   /** Variables detected */
   variables: TemplateVariable[];
 }
+
+// ============================================================================
+// Verify Sessions (Hosted Verification Flow)
+// ============================================================================
+
+export type VerifySessionStatus =
+  | "pending"
+  | "phone_submitted"
+  | "code_sent"
+  | "verified"
+  | "expired"
+  | "cancelled";
+
+export interface CreateVerifySessionRequest {
+  successUrl: string;
+  cancelUrl?: string;
+  brandName?: string;
+  brandColor?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface VerifySession {
+  id: string;
+  url: string;
+  status: VerifySessionStatus;
+  successUrl: string;
+  cancelUrl?: string;
+  brandName?: string;
+  brandColor?: string;
+  phone?: string;
+  verificationId?: string;
+  token?: string;
+  metadata?: Record<string, unknown>;
+  expiresAt: string;
+  createdAt: string;
+}
+
+export interface ValidateSessionTokenRequest {
+  token: string;
+}
+
+export interface ValidateSessionTokenResponse {
+  valid: boolean;
+  sessionId?: string;
+  phone?: string;
+  verifiedAt?: string;
+  metadata?: Record<string, unknown>;
+}
