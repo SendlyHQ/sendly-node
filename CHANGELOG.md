@@ -1,5 +1,52 @@
 # @sendly/node
 
+## 3.11.0
+
+### Minor Changes
+
+- [`687e717`](https://github.com/SendlyHQ/sendly/commit/687e717fa507dbfc45cf724241d443a1c55e5566) Thanks [@sendly-live](https://github.com/sendly-live)! - feat: add Hosted Verification Flow for simplified phone verification
+
+  **New Feature: Hosted Verification Flow**
+
+  Reduce phone verification integration from ~300 lines to ~20 lines with Sendly's hosted UI.
+
+  **Node.js SDK:**
+
+  ```javascript
+  // Create session, redirect user to session.url
+  const session = await sendly.verify.sessions.create({
+    successUrl: "https://yourapp.com/verified",
+    cancelUrl: "https://yourapp.com/signup",
+    brandName: "YourApp",
+    brandColor: "#f59e0b",
+    metadata: { userId: "123" },
+  });
+
+  // After redirect, validate the token
+  const result = await sendly.verify.sessions.validate({ token });
+  if (result.valid) {
+    console.log("Verified phone:", result.phone);
+  }
+  ```
+
+  **CLI:**
+  - No CLI changes in this release (hosted flow is web-based)
+
+  **Also Updated (separate packages):**
+  - Python SDK: `sendly.verify.sessions.create()` / `.validate()`
+  - Go SDK: `client.Verify.Sessions.Create()` / `.Validate()`
+  - Ruby SDK: `sendly.verify.sessions.create()` / `.validate()`
+  - PHP SDK: `$sendly->verify->sessions->create()` / `->validate()`
+  - Java SDK: `sendly.verify().sessions().create()` / `.validate()`
+  - .NET SDK: `sendly.Verify.Sessions.CreateAsync()` / `.ValidateAsync()`
+  - Rust SDK: `client.verify().sessions().create()` / `.validate()`
+
+  **Security:**
+  - Sessions expire in 30 minutes
+  - Tokens are one-time use (48 hex chars, 192 bits entropy)
+  - Tokens scoped to originating API key
+  - HTTPS required for success_url (localhost allowed for dev)
+
 ## 3.8.2
 
 ### Patch Changes
