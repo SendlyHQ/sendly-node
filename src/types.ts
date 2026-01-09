@@ -77,7 +77,12 @@ export interface SendMessageRequest {
  * Message status values
  * Note: "sending" was removed as it doesn't exist in the database
  */
-export type MessageStatus = "queued" | "sent" | "delivered" | "failed";
+export type MessageStatus =
+  | "queued"
+  | "sent"
+  | "delivered"
+  | "failed"
+  | "bounced";
 
 /**
  * How the message was sent

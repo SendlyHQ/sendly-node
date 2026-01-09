@@ -1,5 +1,53 @@
 # @sendly/node
 
+## 3.12.0
+
+### Minor Changes
+
+- feat: add `bounced` message status for carrier rejection tracking
+
+  **New Status: `bounced`**
+  
+  Messages that are permanently rejected by carriers (invalid numbers, landlines, blocked recipients) now return a dedicated `bounced` status instead of generic `failed`.
+
+  ```typescript
+  // MessageStatus type now includes 'bounced'
+  type MessageStatus = "queued" | "sent" | "delivered" | "failed" | "bounced";
+
+  // Check for bounced messages
+  if (message.status === "bounced") {
+    // Handle permanent delivery failure
+    // Consider removing this number from your list
+  }
+  ```
+
+  **Webhook Event: `message.bounced`**
+  
+  Subscribe to `message.bounced` events to detect carrier rejections in real-time:
+
+  ```typescript
+  await sendly.webhooks.create({
+    url: "https://yourapp.com/webhook",
+    events: ["message.delivered", "message.failed", "message.bounced"],
+  });
+  ```
+
+  **When does a message bounce?**
+  - Invalid or disconnected phone numbers
+  - Numbers that cannot receive SMS (landlines, VoIP)
+  - Carrier-level blocks or blacklists
+  - Unallocated or unroutable numbers
+
+  **All 8 SDKs Updated:**
+  - Node.js: `MessageStatus` type includes `"bounced"`
+  - Python: `MessageStatus.BOUNCED` enum value
+  - Ruby: `STATUSES` includes `"bounced"`
+  - Go: `MessageStatusBounced` constant
+  - Rust: `MessageStatus::Bounced` variant
+  - Java: `Message.STATUS_BOUNCED` constant
+  - PHP: `Message::STATUS_BOUNCED` constant
+  - .NET: `MessageStatus.Bounced` enum value
+
 ## 3.11.0
 
 ### Minor Changes
