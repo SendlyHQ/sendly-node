@@ -1,5 +1,17 @@
 # @sendly/node
 
+## 3.12.1
+
+### Patch Changes
+
+- [`6966b6e`](https://github.com/SendlyHQ/sendly/commit/6966b6e3588671d05360cbb2587311285add47c9) Thanks [@sendly-live](https://github.com/sendly-live)! - fix: SDK bug fixes for OTP verification and URL handling
+  - C# SDK: Fix URL path construction - strip leading `/` to prevent paths becoming absolute and ignoring BaseAddress
+  - PHP SDK: Fix OTP verify endpoint to use `to` instead of `phone` parameter
+  - Ruby SDK: Fix OTP verify endpoint to use `to` instead of `phone` parameter
+  - Rust SDK: Add serde rename for `phone` field to serialize as `to` in OTP requests
+  - Documentation: Add ES module setup instructions for Node.js tutorials
+  - Documentation: Fix Go import paths to use `github.com/SendlyHQ/sendly-go/v3/sendly`
+
 ## 3.12.0
 
 ### Minor Changes
@@ -7,7 +19,7 @@
 - feat: add `bounced` message status for carrier rejection tracking
 
   **New Status: `bounced`**
-  
+
   Messages that are permanently rejected by carriers (invalid numbers, landlines, blocked recipients) now return a dedicated `bounced` status instead of generic `failed`.
 
   ```typescript
@@ -22,7 +34,7 @@
   ```
 
   **Webhook Event: `message.bounced`**
-  
+
   Subscribe to `message.bounced` events to detect carrier rejections in real-time:
 
   ```typescript
