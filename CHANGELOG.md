@@ -1,5 +1,15 @@
 # @sendly/node
 
+## 3.12.2
+
+### Patch Changes
+
+- [`3da909d`](https://github.com/SendlyHQ/sendly/commit/3da909d05c0d9b57cf9f31849f050f2f9f44ea44) Thanks [@sendly-live](https://github.com/sendly-live)! - Add Credits and API Key resources to SDKs
+  - PHP SDK: Add Credits resource with balance, history, purchase methods
+  - PHP SDK: Add ApiKey and CreditTransaction models
+  - Python SDK: Improve type hints across types module
+  - Minor fixes and improvements across Go, Rust, .NET SDKs
+
 ## 3.12.1
 
 ### Patch Changes
