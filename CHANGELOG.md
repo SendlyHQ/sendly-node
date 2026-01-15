@@ -1,5 +1,25 @@
 # @sendly/node
 
+## 3.12.3
+
+### Patch Changes
+
+- [`d5e9722`](https://github.com/SendlyHQ/sendly/commit/d5e972221bb63febc6fb48978e15a5c0afd97f2b) Thanks [@sendly-live](https://github.com/sendly-live)! - ### Documentation & SDK Improvements
+
+  **SDK Code Examples**
+  - Added all 9 SDK variants (Node.js, Python, cURL, Go, PHP, Ruby, Java, C#, Rust) to API Reference Overview section
+  - Fixed PHP SDK naming consistency: `Sendly\\SendlyClient` → `Sendly\\Sendly` across 25 code examples
+  - Fixed Java SDK naming: `com.sendly.SendlyClient` → `com.sendly.Sendly` in 3 API key examples
+  - Fixed Rust SDK naming: `sendly::SendlyClient` → `sendly::Sendly` in 1 example
+
+  **CLI Updates**
+  - Updated CLI version references from v3.6.0 to v3.12.2 in documentation
+  - Fixed example output showing correct version number
+
+  **Templates**
+  - Fixed templates page category filtering (OTP, 2FA, Signup, Transaction, General filters now work correctly)
+  - Server endpoints now properly return `category` field for preset templates
+
 ## 3.12.2
 
 ### Patch Changes
