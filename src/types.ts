@@ -1432,3 +1432,371 @@ export interface ValidateSessionTokenResponse {
   verifiedAt?: string;
   metadata?: Record<string, unknown>;
 }
+
+// ============================================================================
+// Campaigns
+// ============================================================================
+
+/**
+ * Campaign status values
+ */
+export type CampaignStatus =
+  | "draft"
+  | "scheduled"
+  | "sending"
+  | "sent"
+  | "paused"
+  | "cancelled"
+  | "failed";
+
+/**
+ * A bulk SMS campaign
+ */
+export interface Campaign {
+  /** Unique campaign identifier */
+  id: string;
+  /** Campaign name */
+  name: string;
+  /** Message text with optional {{variables}} */
+  text: string;
+  /** Template ID if using a template */
+  templateId?: string | null;
+  /** Contact list IDs to send to */
+  contactListIds: string[];
+  /** Current status */
+  status: CampaignStatus;
+  /** Total recipients */
+  recipientCount: number;
+  /** Messages sent so far */
+  sentCount: number;
+  /** Messages delivered */
+  deliveredCount: number;
+  /** Messages failed */
+  failedCount: number;
+  /** Estimated credits needed */
+  estimatedCredits: number;
+  /** Credits actually used */
+  creditsUsed: number;
+  /** Scheduled send time (ISO string) */
+  scheduledAt?: string | null;
+  /** Timezone for scheduled send */
+  timezone?: string | null;
+  /** When campaign started sending */
+  startedAt?: string | null;
+  /** When campaign finished */
+  completedAt?: string | null;
+  /** Creation timestamp */
+  createdAt: string;
+  /** Last update timestamp */
+  updatedAt: string;
+}
+
+/**
+ * Request to create a new campaign
+ */
+export interface CreateCampaignRequest {
+  /** Campaign name */
+  name: string;
+  /** Message text with optional {{variables}} */
+  text: string;
+  /** Template ID to use (optional) */
+  templateId?: string;
+  /** Contact list IDs to send to */
+  contactListIds: string[];
+}
+
+/**
+ * Request to update a campaign
+ */
+export interface UpdateCampaignRequest {
+  /** Campaign name */
+  name?: string;
+  /** Message text */
+  text?: string;
+  /** Template ID */
+  templateId?: string | null;
+  /** Contact list IDs */
+  contactListIds?: string[];
+}
+
+/**
+ * Request to schedule a campaign
+ */
+export interface ScheduleCampaignRequest {
+  /** When to send (ISO 8601 string) */
+  scheduledAt: string;
+  /** Timezone (e.g., "America/New_York") */
+  timezone?: string;
+}
+
+/**
+ * Campaign preview with recipient count and cost estimate
+ */
+export interface CampaignPreview {
+  /** Campaign ID */
+  id: string;
+  /** Total recipients */
+  recipientCount: number;
+  /** Estimated segments (based on message length) */
+  estimatedSegments: number;
+  /** Estimated credits needed */
+  estimatedCredits: number;
+  /** Current credit balance */
+  currentBalance: number;
+  /** Whether user has enough credits */
+  hasEnoughCredits: boolean;
+  /** Breakdown by country/pricing tier */
+  breakdown?: Array<{
+    country: string;
+    count: number;
+    creditsPerMessage: number;
+    totalCredits: number;
+  }>;
+}
+
+/**
+ * Options for listing campaigns
+ */
+export interface ListCampaignsOptions {
+  /** Maximum campaigns to return */
+  limit?: number;
+  /** Offset for pagination */
+  offset?: number;
+  /** Filter by status */
+  status?: CampaignStatus;
+}
+
+/**
+ * Response from listing campaigns
+ */
+export interface CampaignListResponse {
+  /** List of campaigns */
+  campaigns: Campaign[];
+  /** Total count (for pagination) */
+  total: number;
+  /** Current limit */
+  limit: number;
+  /** Current offset */
+  offset: number;
+}
+
+// ============================================================================
+// Contacts
+// ============================================================================
+
+/**
+ * A contact in your address book
+ */
+export interface Contact {
+  /**
+   * Unique contact identifier
+   */
+  id: string;
+
+  /**
+   * Phone number in E.164 format
+   */
+  phoneNumber: string;
+
+  /**
+   * Contact name
+   */
+  name?: string | null;
+
+  /**
+   * Contact email
+   */
+  email?: string | null;
+
+  /**
+   * Custom metadata (key-value pairs)
+   */
+  metadata?: Record<string, any>;
+
+  /**
+   * Whether the contact has opted out
+   */
+  optedOut?: boolean;
+
+  /**
+   * When the contact was created
+   */
+  createdAt: string;
+
+  /**
+   * When the contact was last updated
+   */
+  updatedAt?: string;
+
+  /**
+   * Lists the contact belongs to (when fetching a single contact)
+   */
+  lists?: Array<{ id: string; name: string }>;
+}
+
+/**
+ * Request to create a contact
+ */
+export interface CreateContactRequest {
+  /**
+   * Phone number in E.164 format (e.g., +15551234567)
+   */
+  phoneNumber: string;
+
+  /**
+   * Contact name
+   */
+  name?: string;
+
+  /**
+   * Contact email
+   */
+  email?: string;
+
+  /**
+   * Custom metadata
+   */
+  metadata?: Record<string, any>;
+}
+
+/**
+ * Request to update a contact
+ */
+export interface UpdateContactRequest {
+  /**
+   * Contact name
+   */
+  name?: string;
+
+  /**
+   * Contact email
+   */
+  email?: string;
+
+  /**
+   * Custom metadata
+   */
+  metadata?: Record<string, any>;
+}
+
+/**
+ * Options for listing contacts
+ */
+export interface ListContactsOptions {
+  /**
+   * Max contacts to return (default 50, max 100)
+   */
+  limit?: number;
+
+  /**
+   * Offset for pagination
+   */
+  offset?: number;
+
+  /**
+   * Search query (searches name, phone, email)
+   */
+  search?: string;
+
+  /**
+   * Filter by contact list ID
+   */
+  listId?: string;
+}
+
+/**
+ * Response from listing contacts
+ */
+export interface ContactListResponse {
+  contacts: Contact[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+/**
+ * A contact list for organizing contacts
+ */
+export interface ContactList {
+  /**
+   * Unique list identifier
+   */
+  id: string;
+
+  /**
+   * List name
+   */
+  name: string;
+
+  /**
+   * List description
+   */
+  description?: string | null;
+
+  /**
+   * Number of contacts in the list
+   */
+  contactCount: number;
+
+  /**
+   * When the list was created
+   */
+  createdAt: string;
+
+  /**
+   * When the list was last updated
+   */
+  updatedAt?: string;
+
+  /**
+   * Contacts in the list (when fetching a single list with members)
+   */
+  contacts?: Array<{
+    id: string;
+    phoneNumber: string;
+    name?: string | null;
+    email?: string | null;
+  }>;
+
+  /**
+   * Total contacts in the list (for pagination)
+   */
+  contactsTotal?: number;
+}
+
+/**
+ * Request to create a contact list
+ */
+export interface CreateContactListRequest {
+  /**
+   * List name
+   */
+  name: string;
+
+  /**
+   * List description
+   */
+  description?: string;
+}
+
+/**
+ * Request to update a contact list
+ */
+export interface UpdateContactListRequest {
+  /**
+   * List name
+   */
+  name?: string;
+
+  /**
+   * List description
+   */
+  description?: string;
+}
+
+/**
+ * Response from listing contact lists
+ */
+export interface ContactListsResponse {
+  lists: ContactList[];
+}

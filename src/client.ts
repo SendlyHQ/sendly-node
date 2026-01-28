@@ -10,6 +10,8 @@ import { WebhooksResource } from "./resources/webhooks";
 import { AccountResource } from "./resources/account";
 import { VerifyResource } from "./resources/verify";
 import { TemplatesResource } from "./resources/templates";
+import { CampaignsResource } from "./resources/campaigns";
+import { ContactsResource } from "./resources/contacts";
 
 const DEFAULT_BASE_URL = "https://sendly.live/api/v1";
 const DEFAULT_TIMEOUT = 30000;
@@ -144,6 +146,49 @@ export class Sendly {
    */
   public readonly templates: TemplatesResource;
 
+  /**
+   * Campaigns API resource - Bulk SMS campaign management
+   *
+   * @example
+   * ```typescript
+   * // Create a campaign
+   * const campaign = await sendly.campaigns.create({
+   *   name: 'Welcome Campaign',
+   *   text: 'Hello {{name}}!',
+   *   contactListIds: ['lst_xxx']
+   * });
+   *
+   * // Preview cost
+   * const preview = await sendly.campaigns.preview(campaign.id);
+   * console.log(`Cost: ${preview.estimatedCredits} credits`);
+   *
+   * // Send or schedule
+   * await sendly.campaigns.send(campaign.id);
+   * ```
+   */
+  public readonly campaigns: CampaignsResource;
+
+  /**
+   * Contacts API resource - Contact and list management
+   *
+   * @example
+   * ```typescript
+   * // Create a contact
+   * const contact = await sendly.contacts.create({
+   *   phoneNumber: '+15551234567',
+   *   name: 'John Doe'
+   * });
+   *
+   * // Create a list and add contacts
+   * const list = await sendly.contacts.lists.create({ name: 'VIPs' });
+   * await sendly.contacts.lists.addContacts(list.id, [contact.id]);
+   *
+   * // List all contacts
+   * const { contacts } = await sendly.contacts.list();
+   * ```
+   */
+  public readonly contacts: ContactsResource;
+
   private readonly http: HttpClient;
   private readonly config: Required<SendlyConfig>;
 
@@ -184,6 +229,8 @@ export class Sendly {
     this.account = new AccountResource(this.http);
     this.verify = new VerifyResource(this.http);
     this.templates = new TemplatesResource(this.http);
+    this.campaigns = new CampaignsResource(this.http);
+    this.contacts = new ContactsResource(this.http);
   }
 
   /**

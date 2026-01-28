@@ -99,6 +99,31 @@ export type {
   TemplatePreview,
 } from "./types";
 
+// Types - Campaigns
+export type {
+  CampaignStatus,
+  Campaign,
+  CreateCampaignRequest,
+  UpdateCampaignRequest,
+  ScheduleCampaignRequest,
+  CampaignPreview,
+  ListCampaignsOptions,
+  CampaignListResponse,
+} from "./types";
+
+// Types - Contacts
+export type {
+  Contact,
+  ContactList,
+  CreateContactRequest,
+  UpdateContactRequest,
+  CreateContactListRequest,
+  UpdateContactListRequest,
+  ListContactsOptions,
+  ContactListResponse,
+  ContactListsResponse,
+} from "./types";
+
 // Constants
 export {
   CREDITS_PER_SMS,

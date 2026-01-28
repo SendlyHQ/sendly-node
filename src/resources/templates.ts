@@ -279,7 +279,10 @@ export class TemplatesResource {
    * // "Your MyApp code is 123456"
    * ```
    */
-  async preview(id: string, variables?: Record<string, string>): Promise<TemplatePreview> {
+  async preview(
+    id: string,
+    variables?: Record<string, string>,
+  ): Promise<TemplatePreview> {
     const response = await this.http.request<{
       id: string;
       name: string;
@@ -322,6 +325,51 @@ export class TemplatesResource {
       method: "DELETE",
       path: `/templates/${id}`,
     });
+  }
+
+  /**
+   * Clone a template
+   *
+   * Creates a copy of an existing template (including presets).
+   *
+   * @param id - Template ID to clone
+   * @param options - Optional clone options
+   * @returns The cloned template (as draft)
+   *
+   * @example
+   * ```typescript
+   * // Clone a preset template
+   * const myOtp = await sendly.templates.clone('tpl_preset_otp', {
+   *   name: 'My Custom OTP'
+   * });
+   *
+   * // Modify and publish
+   * await sendly.templates.update(myOtp.id, {
+   *   text: 'Your {{app_name}} code: {{code}}. Expires in 5 min.'
+   * });
+   * await sendly.templates.publish(myOtp.id);
+   * ```
+   */
+  async clone(id: string, options?: { name?: string }): Promise<Template> {
+    const response = await this.http.request<{
+      id: string;
+      name: string;
+      text: string;
+      variables: Array<{ key: string; type: string; fallback?: string }>;
+      is_preset: boolean;
+      preset_slug?: string | null;
+      status: string;
+      version: number;
+      published_at?: string | null;
+      created_at: string;
+      updated_at: string;
+    }>({
+      method: "POST",
+      path: `/templates/${id}/clone`,
+      body: options?.name ? { name: options.name } : {},
+    });
+
+    return this.transformTemplate(response);
   }
 
   private transformTemplate(t: {

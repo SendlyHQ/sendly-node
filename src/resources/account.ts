@@ -244,4 +244,78 @@ export class AccountResource {
       path: `/account/keys/${encodeURIComponent(id)}`,
     });
   }
+
+  /**
+   * Rename an API key
+   *
+   * @param id - API key ID
+   * @param name - New name for the API key
+   * @returns Updated API key
+   *
+   * @example
+   * ```typescript
+   * const key = await sendly.account.renameApiKey('key_xxx', 'Production Key');
+   * console.log(`Renamed to: ${key.name}`);
+   * ```
+   */
+  async renameApiKey(id: string, name: string): Promise<ApiKey> {
+    if (!id) {
+      throw new Error("API key ID is required");
+    }
+    if (!name) {
+      throw new Error("New name is required");
+    }
+
+    const key = await this.http.request<ApiKey>({
+      method: "PATCH",
+      path: `/account/keys/${encodeURIComponent(id)}/rename`,
+      body: { name },
+    });
+
+    return key;
+  }
+
+  /**
+   * Rotate an API key
+   *
+   * Creates a new key while optionally keeping the old one active for a grace period.
+   *
+   * @param id - API key ID to rotate
+   * @param options - Rotation options
+   * @returns New API key with the full key value
+   *
+   * @example
+   * ```typescript
+   * // Rotate immediately (old key stops working instantly)
+   * const { newKey, key } = await sendly.account.rotateApiKey('key_xxx');
+   * console.log(`New key: ${key}`); // Save this!
+   *
+   * // Rotate with 24-hour grace period (both keys work for 24h)
+   * const { newKey, key } = await sendly.account.rotateApiKey('key_xxx', {
+   *   gracePeriodHours: 24
+   * });
+   * ```
+   */
+  async rotateApiKey(
+    id: string,
+    options?: { gracePeriodHours?: number },
+  ): Promise<{ newKey: ApiKey; key: string; oldKeyExpiresAt?: string }> {
+    if (!id) {
+      throw new Error("API key ID is required");
+    }
+
+    const response = await this.http.request<{
+      newKey: ApiKey;
+      key: string;
+      oldKeyExpiresAt?: string;
+    }>({
+      method: "POST",
+      path: `/account/keys/${encodeURIComponent(id)}/rotate`,
+      body: options?.gracePeriodHours
+        ? { gracePeriodHours: options.gracePeriodHours }
+        : {},
+    });
+
+    return response;
+  }
 }
