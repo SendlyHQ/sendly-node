@@ -1,5 +1,42 @@
 # @sendly/node
 
+## 3.13.0
+
+### Minor Changes
+
+- [`c2181c8`](https://github.com/SendlyHQ/sendly/commit/c2181c8f2a07e7d8b17e7262fcbc423c52f4b46c) Thanks [@sendly-live](https://github.com/sendly-live)! - SDK Feature Parity Update - Campaigns, Contacts & Template Clone
+
+  ### Added
+
+  **Server:**
+  - Campaigns API v1: 10 endpoints with API key auth at `/api/v1/campaigns/*`
+  - Contacts API v1: 13 endpoints at `/api/v1/contacts/*` and `/api/v1/contact-lists/*`
+  - New scopes: `contacts:read`, `contacts:write`
+
+  **Node.js SDK:**
+  - Campaigns resource with full CRUD + send/schedule/cancel/clone
+  - Contacts resource with full CRUD
+  - Contact Lists sub-resource for list management
+  - Template clone method (`templates.clone()`)
+  - API key rotate and rename methods
+
+  **CLI:**
+  - 8 campaign commands: list, get, create, preview, send, schedule, cancel, delete
+  - 9 contacts commands: list, get, create, delete + lists subcommands
+  - Template clone command (`sendly templates clone <id>`)
+  - Key rotate/rename commands
+
+  ### All Other SDKs (Python, Ruby, Java, PHP, Go, Rust, .NET)
+  - Campaigns resource with full CRUD + send/schedule/cancel/clone
+  - Contacts resource with full CRUD
+  - Contact Lists sub-resource for list management
+  - Template clone method
+
+  ### Fixed
+  - **Campaign Builder Compliance**: Opted-out contacts are now ALWAYS excluded from campaigns (TCPA compliance)
+  - **Draft State Restoration**: Campaign timezone is now properly restored when reopening drafts
+  - DELETE endpoints now return 204 (no content) consistently across all SDKs
+
 ## 3.12.3
 
 ### Patch Changes
