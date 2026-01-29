@@ -1552,6 +1552,29 @@ export interface CampaignPreview {
     creditsPerMessage: number;
     totalCredits: number;
   }>;
+  /** Number of recipients blocked due to destination restrictions */
+  blockedCount?: number;
+  /** Number of recipients that can be reached */
+  sendableCount?: number;
+  /** Per-country breakdown with access info */
+  byCountry?: Record<
+    string,
+    {
+      count: number;
+      credits: number;
+      allowed: boolean;
+      blockedReason?: string;
+    }
+  >;
+  /** Validation warnings */
+  warnings?: string[];
+  /** User's messaging profile access info */
+  messagingProfile?: {
+    canSendDomestic: boolean;
+    canSendInternational: boolean;
+    verificationType: string | null;
+    verificationStatus: string | null;
+  };
 }
 
 /**
