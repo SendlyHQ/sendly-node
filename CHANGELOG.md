@@ -1,5 +1,13 @@
 # @sendly/node
 
+## 3.13.1
+
+### Patch Changes
+
+- [`130551c`](https://github.com/SendlyHQ/sendly/commit/130551c66748e019970a352f2f09986f1d5253e3) Thanks [@sendly-live](https://github.com/sendly-live)! - CLI: Add contacts import, campaigns update/clone, contacts update, contacts lists get/update commands. Fix campaign preview and send display output to match API response fields. Fix contact list field mapping for snake_case API responses.
+
+  Server: Add POST /api/v1/contacts/import endpoint for bulk CSV import with dedup. Fix campaign send route to pass isTestKey for sandbox mode. Fix campaign preview to return hasEnoughCredits: true for test keys.
+
 ## 3.13.0
 
 ### Minor Changes
