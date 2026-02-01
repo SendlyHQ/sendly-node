@@ -122,6 +122,10 @@ export type {
   ListContactsOptions,
   ContactListResponse,
   ContactListsResponse,
+  ImportContactItem,
+  ImportContactsRequest,
+  ImportContactsError,
+  ImportContactsResponse,
 } from "./types";
 
 // Constants

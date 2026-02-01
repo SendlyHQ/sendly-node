@@ -1823,3 +1823,29 @@ export interface UpdateContactListRequest {
 export interface ContactListsResponse {
   lists: ContactList[];
 }
+
+export interface ImportContactItem {
+  phone: string;
+  name?: string;
+  email?: string;
+  optedInAt?: string;
+}
+
+export interface ImportContactsRequest {
+  contacts: ImportContactItem[];
+  listId?: string;
+  optedInAt?: string;
+}
+
+export interface ImportContactsError {
+  index: number;
+  phone: string;
+  error: string;
+}
+
+export interface ImportContactsResponse {
+  imported: number;
+  skippedDuplicates: number;
+  errors: ImportContactsError[];
+  totalErrors: number;
+}

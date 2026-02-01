@@ -14,6 +14,8 @@ import type {
   ListContactsOptions,
   ContactListResponse,
   ContactListsResponse,
+  ImportContactsRequest,
+  ImportContactsResponse,
 } from "../types";
 
 /**
@@ -185,6 +187,22 @@ export class ContactsResource {
     });
   }
 
+  async import(
+    request: ImportContactsRequest,
+  ): Promise<ImportContactsResponse> {
+    const body: Record<string, unknown> = {
+      contacts: request.contacts,
+    };
+    if (request.listId) body.listId = request.listId;
+    if (request.optedInAt) body.optedInAt = request.optedInAt;
+
+    return this.http.request<ImportContactsResponse>({
+      method: "POST",
+      path: "/contacts/import",
+      body,
+    });
+  }
+
   private transformContact(raw: RawContact): Contact {
     return {
       id: raw.id,
@@ -251,7 +269,10 @@ export class ContactListsResource {
    * console.log(`Showing ${list.contacts?.length} of ${list.contactsTotal}`);
    * ```
    */
-  async get(id: string, options: { limit?: number; offset?: number } = {}): Promise<ContactList> {
+  async get(
+    id: string,
+    options: { limit?: number; offset?: number } = {},
+  ): Promise<ContactList> {
     const params = new URLSearchParams();
     if (options.limit) params.set("limit", String(options.limit));
     if (options.offset) params.set("offset", String(options.offset));
@@ -307,7 +328,10 @@ export class ContactListsResource {
    * });
    * ```
    */
-  async update(id: string, request: UpdateContactListRequest): Promise<ContactList> {
+  async update(
+    id: string,
+    request: UpdateContactListRequest,
+  ): Promise<ContactList> {
     const response = await this.http.request<RawContactList>({
       method: "PATCH",
       path: `/contact-lists/${id}`,
@@ -356,8 +380,14 @@ export class ContactListsResource {
    * console.log(`Added ${result.addedCount} contacts`);
    * ```
    */
-  async addContacts(listId: string, contactIds: string[]): Promise<{ addedCount: number }> {
-    const response = await this.http.request<{ success: boolean; added_count: number }>({
+  async addContacts(
+    listId: string,
+    contactIds: string[],
+  ): Promise<{ addedCount: number }> {
+    const response = await this.http.request<{
+      success: boolean;
+      added_count: number;
+    }>({
       method: "POST",
       path: `/contact-lists/${listId}/contacts`,
       body: { contact_ids: contactIds },
