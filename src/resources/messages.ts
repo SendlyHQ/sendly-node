@@ -93,6 +93,7 @@ export class MessagesResource {
         text: request.text,
         ...(request.from && { from: request.from }),
         ...(request.messageType && { messageType: request.messageType }),
+        ...(request.metadata && { metadata: request.metadata }),
       },
     });
 
@@ -283,6 +284,7 @@ export class MessagesResource {
         scheduledAt: request.scheduledAt,
         ...(request.from && { from: request.from }),
         ...(request.messageType && { messageType: request.messageType }),
+        ...(request.metadata && { metadata: request.metadata }),
       },
     });
 
@@ -430,6 +432,7 @@ export class MessagesResource {
         messages: request.messages,
         ...(request.from && { from: request.from }),
         ...(request.messageType && { messageType: request.messageType }),
+        ...(request.metadata && { metadata: request.metadata }),
       },
     });
 

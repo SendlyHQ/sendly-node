@@ -439,6 +439,12 @@ export interface BatchMessageRequest {
    * - "transactional": OTPs, confirmations, alerts - bypasses quiet hours (24/7)
    */
   messageType?: MessageType;
+
+  /**
+   * Custom JSON metadata to attach to all messages in the batch (max 4KB).
+   * Stored on each message record and included in webhook event payloads.
+   */
+  metadata?: Record<string, any>;
 }
 
 /**
