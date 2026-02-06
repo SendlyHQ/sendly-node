@@ -71,6 +71,12 @@ export interface SendMessageRequest {
    * - "transactional": OTPs, confirmations, alerts - bypasses quiet hours (24/7)
    */
   messageType?: MessageType;
+
+  /**
+   * Custom JSON metadata to attach to the message (max 4KB).
+   * Stored on the message record and included in webhook event payloads.
+   */
+  metadata?: Record<string, any>;
 }
 
 /**
@@ -175,6 +181,11 @@ export interface Message {
    * ISO 8601 timestamp when the message was delivered (if applicable)
    */
   deliveredAt?: string | null;
+
+  /**
+   * Custom JSON metadata attached to the message
+   */
+  metadata?: Record<string, any>;
 }
 
 /**
@@ -249,6 +260,12 @@ export interface ScheduleMessageRequest {
    * - "transactional": OTPs, confirmations, alerts - bypasses quiet hours (24/7)
    */
   messageType?: MessageType;
+
+  /**
+   * Custom JSON metadata to attach to the message (max 4KB).
+   * Stored on the message record and included in webhook event payloads.
+   */
+  metadata?: Record<string, any>;
 }
 
 /**
