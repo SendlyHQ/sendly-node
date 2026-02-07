@@ -1,5 +1,11 @@
 # @sendly/node
 
+## 3.15.1
+
+### Patch Changes
+
+- [`a4d42ea`](https://github.com/SendlyHQ/sendly/commit/a4d42ea64f546a1267ee40d857f5447885a4bbf5) Thanks [@sendly-live](https://github.com/sendly-live)! - fix: pass metadata field through to API in send(), schedule(), and sendBatch() methods
+
 ## 3.13.1
 
 ### Patch Changes
