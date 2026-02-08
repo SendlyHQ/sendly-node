@@ -416,6 +416,12 @@ export interface BatchMessageItem {
    * Message content
    */
   text: string;
+
+  /**
+   * Custom JSON metadata for this message (max 4KB).
+   * Merged with batch-level metadata, with per-message metadata taking priority.
+   */
+  metadata?: Record<string, any>;
 }
 
 /**
