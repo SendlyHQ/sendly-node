@@ -1,5 +1,17 @@
 # @sendly/node
 
+## 3.15.2
+
+### Patch Changes
+
+- [`5124b19`](https://github.com/SendlyHQ/sendly/commit/5124b19ddec4c927ee7b57abfb794dbb93575380) Thanks [@sendly-live](https://github.com/sendly-live)! - feat(sdks): add metadata support consistency across all SDKs
+  - Add metadata field to BatchMessageItem for per-message metadata in batch operations
+  - Add metadata to Python SDK request/response types and fix sync docstrings
+  - Add metadata to PHP Message class
+  - Add metadata to Ruby Message class with YARD docs
+  - Add metadata usage examples to all SDK READMEs
+  - Fix flaky Rust test for network errors
+
 ## 3.15.1
 
 ### Patch Changes
