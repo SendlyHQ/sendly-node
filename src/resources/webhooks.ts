@@ -251,6 +251,34 @@ export class WebhooksResource {
   }
 
   /**
+   * Reset the circuit breaker for a webhook
+   *
+   * Manually resets an open circuit breaker so deliveries resume immediately
+   * instead of waiting for the automatic 5-minute recovery.
+   *
+   * @param id - Webhook ID
+   * @returns Reset confirmation with updated webhook
+   *
+   * @example
+   * ```typescript
+   * const result = await sendly.webhooks.resetCircuit('whk_xxx');
+   * console.log(result.message);
+   * ```
+   */
+  async resetCircuit(id: string): Promise<{ message: string; webhook: Webhook }> {
+    if (!id || !id.startsWith("whk_")) {
+      throw new Error("Invalid webhook ID format");
+    }
+
+    const response = await this.http.request<unknown>({
+      method: "POST",
+      path: `/webhooks/${encodeURIComponent(id)}/reset-circuit`,
+    });
+
+    return transformKeys<{ message: string; webhook: Webhook }>(response);
+  }
+
+  /**
    * Rotate the webhook signing secret
    *
    * The old secret remains valid for 24 hours to allow for graceful migration.
