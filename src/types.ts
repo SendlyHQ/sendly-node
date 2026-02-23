@@ -1132,6 +1132,13 @@ export interface CreditTransaction {
   createdAt: string;
 }
 
+export interface TransferCreditsResponse {
+  success: boolean;
+  amount: number;
+  sourceBalance: number;
+  targetBalance: number;
+}
+
 /**
  * An API key
  */

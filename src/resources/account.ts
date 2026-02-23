@@ -106,6 +106,25 @@ export class AccountResource {
     return transactions;
   }
 
+  async transferCredits(options: {
+    targetOrganizationId: string;
+    amount: number;
+  }): Promise<{
+    success: boolean;
+    amount: number;
+    sourceBalance: number;
+    targetBalance: number;
+  }> {
+    return this.http.request({
+      method: "POST",
+      path: "/credits/transfer",
+      body: {
+        targetOrganizationId: options.targetOrganizationId,
+        amount: options.amount,
+      },
+    });
+  }
+
   /**
    * List API keys for the account
    *
