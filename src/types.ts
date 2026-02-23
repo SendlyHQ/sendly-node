@@ -88,7 +88,8 @@ export type MessageStatus =
   | "sent"
   | "delivered"
   | "failed"
-  | "bounced";
+  | "bounced"
+  | "retrying";
 
 /**
  * How the message was sent
@@ -133,6 +134,16 @@ export interface Message {
    * Error message if status is "failed"
    */
   error?: string | null;
+
+  /**
+   * Structured error code (e.g., "E001" for invalid number)
+   */
+  errorCode?: string | null;
+
+  /**
+   * Number of retry attempts made
+   */
+  retryCount?: number;
 
   /**
    * Number of SMS segments (1 per 160 chars)
@@ -874,6 +885,7 @@ export type WebhookEventType =
   | "message.delivered"
   | "message.failed"
   | "message.bounced"
+  | "message.retrying"
   | "message.queued";
 
 /**

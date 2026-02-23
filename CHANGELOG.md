@@ -1,5 +1,29 @@
 # @sendly/node
 
+## 3.17.0
+
+### Minor Changes
+
+- [`ecbc76c`](https://github.com/SendlyHQ/sendly/commit/ecbc76ccf9d86faf02df0d5a78787bf063e49cc8) Thanks [@sendly-live](https://github.com/sendly-live)! - Add structured error classification and automatic message retry
+  - Messages that fail with transient errors (sending_failed, timeout, rate limit) now auto-retry up to 3 times with exponential backoff (30s, 2min, 8min)
+  - New `errorCode` field classifies errors into 13 structured codes (E001-E013, E099)
+  - New `retryCount` field tracks retry attempts
+  - New "bounced" and "retrying" message statuses with badges across all UIs
+  - All 8 SDKs updated with `retrying` status, `errorCode`, `retryCount` fields, and `message.retrying` webhook event
+  - CLI: `webhooks listen` defaults now include `message.retrying`, trigger command supports it
+  - v1 API responses include `error`, `errorCode`, `retryCount` for both list and single-message endpoints
+  - No credit re-charge on retries — original deduction covers all attempts
+
+## 3.16.0
+
+### Minor Changes
+
+- [`53f3a3c`](https://github.com/SendlyHQ/sendly/commit/53f3a3c1e291cb35ff235291a2e4942dfef40ded) Thanks [@sendly-live](https://github.com/sendly-live)! - Add credit transfer support to all SDKs and circuit breaker half-open recovery
+  - All 8 SDKs now support `transferCredits()` / `transfer_credits()` for moving credits between workspaces
+  - Circuit breaker auto-recovers after 5 minutes via half-open state
+  - Manual circuit reset via API and dashboard UI
+  - CLI version bump with credits transfer command
+
 ## 3.15.2
 
 ### Patch Changes
