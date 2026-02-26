@@ -12,6 +12,7 @@ import { VerifyResource } from "./resources/verify";
 import { TemplatesResource } from "./resources/templates";
 import { CampaignsResource } from "./resources/campaigns";
 import { ContactsResource } from "./resources/contacts";
+import { MediaResource } from "./resources/media";
 
 const DEFAULT_BASE_URL = "https://sendly.live/api/v1";
 const DEFAULT_TIMEOUT = 30000;
@@ -189,6 +190,27 @@ export class Sendly {
    */
   public readonly contacts: ContactsResource;
 
+  /**
+   * Media API resource - Upload media for MMS
+   *
+   * @example
+   * ```typescript
+   * // Upload a file
+   * const media = await sendly.media.upload(fileBuffer, {
+   *   filename: 'photo.jpg',
+   *   contentType: 'image/jpeg'
+   * });
+   *
+   * // Send as MMS
+   * await sendly.messages.send({
+   *   to: '+15551234567',
+   *   text: 'Check this out!',
+   *   mediaUrls: [media.url]
+   * });
+   * ```
+   */
+  public readonly media: MediaResource;
+
   private readonly http: HttpClient;
   private readonly config: Required<SendlyConfig>;
 
@@ -231,6 +253,7 @@ export class Sendly {
     this.templates = new TemplatesResource(this.http);
     this.campaigns = new CampaignsResource(this.http);
     this.contacts = new ContactsResource(this.http);
+    this.media = new MediaResource(this.http);
   }
 
   /**

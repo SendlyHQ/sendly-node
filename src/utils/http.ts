@@ -141,6 +141,62 @@ export class HttpClient {
   }
 
   /**
+   * Make an HTTP request with a raw body (for multipart uploads)
+   */
+  async requestFormData<T>(
+    path: string,
+    body: FormData,
+    headers: Record<string, string> = {},
+  ): Promise<T> {
+    const url = this.buildUrl(path);
+    const baseHeaders = this.buildHeaders();
+    delete baseHeaders["Content-Type"];
+
+    const mergedHeaders = { ...baseHeaders, ...headers };
+
+    let lastError: Error | undefined;
+
+    for (let attempt = 0; attempt <= this.config.maxRetries; attempt++) {
+      try {
+        const response = await this.executeRequest(url, {
+          method: "POST",
+          headers: mergedHeaders,
+          body,
+        });
+
+        this.updateRateLimitInfo(response.headers);
+        const data = await this.parseResponse<T>(response);
+        return data;
+      } catch (error) {
+        lastError = error as Error;
+
+        if (error instanceof SendlyError) {
+          if (
+            error.statusCode === 401 ||
+            error.statusCode === 403 ||
+            error.statusCode === 400 ||
+            error.statusCode === 404 ||
+            error.statusCode === 402
+          ) {
+            throw error;
+          }
+          if (error instanceof RateLimitError) {
+            throw error;
+          }
+        }
+
+        if (attempt < this.config.maxRetries) {
+          const backoffTime = this.calculateBackoff(attempt);
+          await this.sleep(backoffTime);
+          continue;
+        }
+      }
+    }
+
+    throw lastError || new NetworkError("Request failed after retries");
+  }
+
+  /**
    * Execute the HTTP request
    */
   private async executeRequest(

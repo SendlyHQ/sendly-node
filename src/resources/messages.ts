@@ -94,6 +94,7 @@ export class MessagesResource {
         ...(request.from && { from: request.from }),
         ...(request.messageType && { messageType: request.messageType }),
         ...(request.metadata && { metadata: request.metadata }),
+        ...(request.mediaUrls && { mediaUrls: request.mediaUrls }),
       },
     });
 

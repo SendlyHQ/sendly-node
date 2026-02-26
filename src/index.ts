@@ -53,6 +53,9 @@ export type {
   PricingTier,
 } from "./types";
 
+// Types - Media
+export type { MediaFile, MediaUploadOptions } from "./types";
+
 // Types - Webhooks
 export type {
   WebhookEventType,

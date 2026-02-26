@@ -1,5 +1,15 @@
 # @sendly/node
 
+## 3.18.0
+
+### Minor Changes
+
+- Add MMS support for US/CA domestic messaging
+  - New `media` resource for uploading images (JPEG, PNG, GIF up to 600KB)
+  - `mediaUrls` parameter on `messages.send()` for sending MMS
+  - New `--media-url` flag on `sendly sms send` CLI command
+  - Supports up to 10 media attachments per message at 4 credits per MMS
+
 ## 3.17.0
 
 ### Minor Changes

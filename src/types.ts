@@ -77,6 +77,12 @@ export interface SendMessageRequest {
    * Stored on the message record and included in webhook event payloads.
    */
   metadata?: Record<string, any>;
+
+  /**
+   * URLs of media files to include as MMS attachments.
+   * Must be publicly accessible HTTPS URLs. Max 10 per message.
+   */
+  mediaUrls?: string[];
 }
 
 /**
@@ -234,6 +240,52 @@ export interface MessageListResponse {
    * Total count of messages returned
    */
   count: number;
+}
+
+// ============================================================================
+// Media
+// ============================================================================
+
+/**
+ * An uploaded media file for MMS
+ */
+export interface MediaFile {
+  /**
+   * Unique media file identifier
+   */
+  id: string;
+
+  /**
+   * Publicly accessible URL for the media file
+   */
+  url: string;
+
+  /**
+   * MIME type of the file (e.g., "image/jpeg")
+   */
+  contentType: string;
+
+  /**
+   * File size in bytes
+   */
+  sizeBytes: number;
+}
+
+/**
+ * Options for uploading a media file
+ */
+export interface MediaUploadOptions {
+  /**
+   * Filename for the upload
+   * @default "upload.jpg"
+   */
+  filename?: string;
+
+  /**
+   * MIME content type
+   * @default "image/jpeg"
+   */
+  contentType?: string;
 }
 
 // ============================================================================
