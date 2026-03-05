@@ -13,6 +13,7 @@ import { TemplatesResource } from "./resources/templates";
 import { CampaignsResource } from "./resources/campaigns";
 import { ContactsResource } from "./resources/contacts";
 import { MediaResource } from "./resources/media";
+import { EnterpriseResource } from "./resources/enterprise";
 
 const DEFAULT_BASE_URL = "https://sendly.live/api/v1";
 const DEFAULT_TIMEOUT = 30000;
@@ -211,6 +212,23 @@ export class Sendly {
    */
   public readonly media: MediaResource;
 
+  /**
+   * Enterprise API resource - Multi-workspace management
+   *
+   * @example
+   * ```typescript
+   * // Get enterprise account
+   * const account = await sendly.enterprise.getAccount();
+   *
+   * // Create a workspace
+   * const workspace = await sendly.enterprise.workspaces.create({ name: 'New Workspace' });
+   *
+   * // Get analytics
+   * const overview = await sendly.enterprise.analytics.overview();
+   * ```
+   */
+  public readonly enterprise: EnterpriseResource;
+
   private readonly http: HttpClient;
   private readonly config: Required<SendlyConfig>;
 
@@ -254,6 +272,7 @@ export class Sendly {
     this.campaigns = new CampaignsResource(this.http);
     this.contacts = new ContactsResource(this.http);
     this.media = new MediaResource(this.http);
+    this.enterprise = new EnterpriseResource(this.http);
   }
 
   /**

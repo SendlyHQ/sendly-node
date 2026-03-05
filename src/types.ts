@@ -852,7 +852,7 @@ export type PricingTier = "domestic" | "tier1" | "tier2" | "tier3";
  * Credits required per SMS segment by tier
  */
 export const CREDITS_PER_SMS: Record<PricingTier, number> = {
-  domestic: 1,
+  domestic: 2,
   tier1: 8,
   tier2: 12,
   tier3: 16,
@@ -1948,4 +1948,413 @@ export interface ImportContactsResponse {
   skippedDuplicates: number;
   errors: ImportContactsError[];
   totalErrors: number;
+}
+
+// ============================================================================
+// Enterprise
+// ============================================================================
+
+export interface EnterpriseAccount {
+  id: string;
+  maxWorkspaces: number;
+  workspaceCount: number;
+  workspaces: EnterpriseWorkspaceSummary[];
+  metadata: Record<string, unknown>;
+}
+
+export interface EnterpriseWorkspaceSummary {
+  id: string;
+  name: string;
+  slug: string;
+  verificationStatus: string | null;
+  verificationType: string | null;
+  tollFreeNumber: string | null;
+  creditBalance: number;
+}
+
+export interface EnterpriseWorkspace {
+  id: string;
+  name: string;
+  slug: string;
+  verificationStatus: string | null;
+  verificationType: string | null;
+  tollFreeNumber: string | null;
+  creditBalance: number;
+  keyCount: number;
+  messages30d: number;
+  delivered30d: number;
+  failed30d: number;
+  createdAt: string;
+}
+
+export interface EnterpriseWorkspaceDetail {
+  id: string;
+  name: string;
+  slug: string;
+  verificationStatus: string | null;
+  tollFreeNumber: string | null;
+  businessName: string | null;
+  creditBalance: number;
+  keys: Array<{
+    id: string;
+    name: string;
+    keyPrefix: string;
+    createdAt: string;
+    lastUsedAt: string | null;
+  }>;
+  messages30d: number;
+  delivered30d: number;
+  failed30d: number;
+  deliveryRate: number;
+}
+
+export interface CreateWorkspaceOptions {
+  name: string;
+  description?: string;
+}
+
+export interface ProvisionWorkspaceOptions {
+  name: string;
+  sourceWorkspaceId?: string;
+  inheritWithNewNumber?: boolean;
+  verification?: {
+    businessName: string;
+    website: string;
+    address: {
+      street: string;
+      city: string;
+      state: string;
+      zip: string;
+      country?: string;
+    };
+    contact: {
+      firstName: string;
+      lastName: string;
+      email: string;
+      phone: string;
+    };
+    brn?: string;
+    brnType?: string;
+    brnCountry?: string;
+    useCase: string;
+    useCaseSummary: string;
+    sampleMessages: string;
+    optInWorkflow: string;
+    optInImageUrls?: string;
+    monthlyVolume?: string;
+  };
+  creditAmount?: number;
+  creditSourceWorkspaceId?: string;
+  keyName?: string;
+  keyType?: "test" | "live";
+  webhookUrl?: string;
+  generateOptInPage?: boolean;
+}
+
+export interface ProvisionWorkspaceResult {
+  workspace: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+  verification?: {
+    id: string;
+    status: string;
+    type: string;
+    tollFreeNumber: string | null;
+    inherited?: boolean;
+    newNumber?: boolean;
+  };
+  credits?: {
+    balance: number;
+    transferred?: number;
+  };
+  apiKey?: {
+    id: string;
+    name: string;
+    prefix: string;
+    key?: string;
+  };
+  optInPage?: {
+    url: string;
+    slug: string;
+    pageId: string;
+  };
+  legalPages?: {
+    privacyUrl?: string;
+    termsUrl?: string;
+  };
+  webhook?: {
+    id: string;
+    url: string;
+  };
+  apiBaseUrl?: string;
+  dashboardUrl?: string;
+}
+
+export interface TransferCreditsOptions {
+  sourceWorkspaceId: string;
+  amount: number;
+}
+
+export interface TransferCreditsResult {
+  success: boolean;
+  sourceBalance: number;
+  targetBalance: number;
+}
+
+export interface CreateKeyOptions {
+  name?: string;
+  type?: "live" | "test";
+}
+
+export interface CreatedApiKey {
+  id: string;
+  name: string;
+  key: string;
+  keyPrefix: string;
+  createdAt: string;
+}
+
+export interface WorkspaceCredits {
+  balance: number;
+  lifetimeCredits: number;
+}
+
+export interface EnterpriseWebhook {
+  url: string;
+}
+
+export interface EnterpriseWebhookTestResult {
+  success: boolean;
+  statusCode?: number;
+  statusText?: string;
+  error?: string;
+}
+
+export interface AnalyticsOverview {
+  totalMessages: number;
+  deliveredMessages: number;
+  failedMessages: number;
+  deliveryRate: number;
+  totalCreditsUsed: number;
+  activeWorkspaces: number;
+}
+
+export interface MessageAnalyticsDataPoint {
+  date: string;
+  sent: number;
+  delivered: number;
+  failed: number;
+}
+
+export interface MessageAnalytics {
+  period: string;
+  data: MessageAnalyticsDataPoint[];
+}
+
+export interface DeliveryAnalyticsItem {
+  workspaceId: string;
+  name: string;
+  sent: number;
+  delivered: number;
+  failed: number;
+  rate: number;
+}
+
+export interface CreditAnalyticsDataPoint {
+  date: string;
+  used: number;
+  transferred: number;
+  purchased: number;
+}
+
+export interface CreditAnalytics {
+  period: string;
+  data: CreditAnalyticsDataPoint[];
+}
+
+export type AnalyticsPeriod = "7d" | "30d" | "90d";
+
+export interface OptInPage {
+  id: string;
+  slug: string;
+  url: string;
+  businessName: string;
+  useCase: string | null;
+  isActive: boolean;
+  viewCount: number;
+  logoUrl: string | null;
+  headerColor: string | null;
+  buttonColor: string | null;
+  customHeadline: string | null;
+  createdAt: string;
+}
+
+export interface CreateOptInPageOptions {
+  businessName: string;
+  useCase?: string;
+  useCaseSummary?: string;
+  sampleMessages?: string;
+}
+
+export interface CreateOptInPageResult {
+  id: string;
+  slug: string;
+  url: string;
+  businessName: string;
+}
+
+export interface UpdateOptInPageOptions {
+  logoUrl?: string;
+  headerColor?: string;
+  buttonColor?: string;
+  customHeadline?: string;
+  customBenefits?: string[];
+}
+
+export interface WorkspaceWebhook {
+  id: string;
+  url: string;
+  events: string[];
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface SetWorkspaceWebhookOptions {
+  url: string;
+  events?: string[];
+  description?: string;
+}
+
+export interface SetWorkspaceWebhookResult {
+  id: string;
+  url: string;
+  events: string[];
+  secret?: string;
+  created?: boolean;
+  updated?: boolean;
+}
+
+export interface SuspendWorkspaceOptions {
+  reason?: string;
+}
+
+export interface SuspendWorkspaceResult {
+  id: string;
+  status: string;
+  suspendedAt: string;
+}
+
+export interface ResumeWorkspaceResult {
+  id: string;
+  status: string;
+}
+
+export interface AutoTopUpSettings {
+  enabled: boolean;
+  threshold: number;
+  amount: number;
+  sourceWorkspaceId: string | null;
+}
+
+export interface UpdateAutoTopUpOptions {
+  enabled: boolean;
+  threshold: number;
+  amount: number;
+  sourceWorkspaceId?: string | null;
+}
+
+export interface BillingBreakdownOptions {
+  period?: AnalyticsPeriod;
+  page?: number;
+  limit?: number;
+}
+
+export interface WorkspaceBillingItem {
+  id: string;
+  name: string;
+  creditsUsed: number;
+  creditsPurchased: number;
+  creditsTransferredIn: number;
+  creditsTransferredOut: number;
+  messagesSent: number;
+  messagesDelivered: number;
+  workspaceFee: number;
+  allocatedPlatformFee: number;
+  totalCost: number;
+}
+
+export interface BillingBreakdown {
+  period: string;
+  summary: {
+    platformFee: number;
+    totalWorkspaceFees: number;
+    totalCreditsUsed: number;
+    totalCost: number;
+  };
+  workspaces: WorkspaceBillingItem[];
+}
+
+export interface BulkProvisionWorkspace {
+  name: string;
+  sourceWorkspaceId?: string;
+  creditAmount?: number;
+  creditSourceWorkspaceId?: string;
+}
+
+export interface BulkProvisionResultItem {
+  name: string;
+  status: "success" | "partial" | "failed";
+  workspaceId?: string;
+  slug?: string;
+  warning?: string;
+  error?: string;
+}
+
+export interface BulkProvisionResult {
+  results: BulkProvisionResultItem[];
+  summary: {
+    total: number;
+    succeeded: number;
+    failed: number;
+  };
+}
+
+export interface DnsRecord {
+  type: string;
+  name: string;
+  value: string;
+}
+
+export interface SetCustomDomainResult {
+  domain: string;
+  verified: boolean;
+  dnsInstructions: {
+    cname: DnsRecord;
+    txt: DnsRecord;
+  };
+}
+
+export interface SendInvitationOptions {
+  email: string;
+  role: "admin" | "member" | "viewer";
+}
+
+export interface Invitation {
+  id: string;
+  email: string;
+  role: string;
+  status: string;
+  expiresAt: string;
+}
+
+export interface QuotaSettings {
+  monthlyMessageQuota: number | null;
+  messagesThisMonth: number;
+  quotaResetAt: string | null;
+}
+
+export interface UpdateQuotaOptions {
+  monthlyMessageQuota: number | null;
 }

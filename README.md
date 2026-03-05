@@ -420,7 +420,7 @@ await sendly.messages.send({
 import { CREDITS_PER_SMS, SUPPORTED_COUNTRIES } from '@sendly/node';
 
 // Credits per SMS by tier
-console.log(CREDITS_PER_SMS.domestic); // 1 (US/Canada)
+console.log(CREDITS_PER_SMS.domestic); // 2 (US/Canada)
 console.log(CREDITS_PER_SMS.tier1);    // 8 (UK, Poland, India, etc.)
 console.log(CREDITS_PER_SMS.tier2);    // 12 (France, Japan, Australia, etc.)
 console.log(CREDITS_PER_SMS.tier3);    // 16 (Germany, Italy, Mexico, etc.)
@@ -604,6 +604,119 @@ Get an API key by ID.
 #### `getApiKeyUsage(id: string): Promise<ApiKeyUsage>`
 
 Get usage statistics for an API key.
+
+## Enterprise
+
+The Enterprise API lets you programmatically manage workspaces, verification, credits, and API keys for multi-tenant platforms. Requires an enterprise master key (`sk_live_v1_master_*`).
+
+### Quick Provision
+
+Create a fully configured workspace in a single call:
+
+```typescript
+const client = new Sendly('sk_live_v1_master_YOUR_KEY');
+
+// Inherit verification from an existing workspace (fastest)
+const result = await client.enterprise.provision({
+  name: 'Acme Insurance - Austin',
+  sourceWorkspaceId: 'ws_verified',
+  creditAmount: 5000,
+  creditSourceWorkspaceId: 'ws_pool',
+  keyName: 'Production',
+  keyType: 'live',
+  generateOptInPage: true
+});
+
+console.log(result.workspace.id);
+console.log(result.apiKey?.rawKey);  // shown once
+console.log(result.optInPage?.url);  // hosted opt-in page
+```
+
+Three provisioning modes:
+
+| Mode | Params | Description |
+|------|--------|-------------|
+| **Inherit** | `sourceWorkspaceId` | Shares toll-free number from verified workspace |
+| **Inherit + New Number** | `sourceWorkspaceId` + `inheritWithNewNumber: true` | Copies business info, purchases new number |
+| **Fresh** | `verification: { ... }` | Full business details, new number + carrier approval |
+
+### Workspace Management
+
+```typescript
+// Create
+const ws = await client.enterprise.workspaces.create({ name: 'Acme Insurance' });
+
+// List
+const { workspaces } = await client.enterprise.workspaces.list();
+
+// Get details
+const detail = await client.enterprise.workspaces.get('ws_xxx');
+
+// Delete
+await client.enterprise.workspaces.delete('ws_xxx');
+```
+
+### Verification
+
+```typescript
+// Submit full verification
+await client.enterprise.workspaces.submitVerification('ws_xxx', {
+  businessName: 'Acme Insurance LLC',
+  businessType: 'llc',
+  ein: '12-3456789',
+  address: '100 Main St',
+  city: 'Austin',
+  state: 'TX',
+  zip: '78701',
+  useCase: 'Policy renewal reminders',
+  sampleMessages: ['Your policy renews on 3/15.']
+});
+
+// Inherit from verified workspace
+await client.enterprise.workspaces.inheritVerification('ws_new', {
+  sourceWorkspaceId: 'ws_verified'
+});
+
+// Inherit with new number
+await client.enterprise.workspaces.inheritVerification('ws_new', {
+  sourceWorkspaceId: 'ws_verified',
+  purchaseNewNumber: true
+});
+```
+
+### Credits & API Keys
+
+```typescript
+// Transfer credits
+await client.enterprise.workspaces.transferCredits('ws_dest', {
+  sourceWorkspaceId: 'ws_source',
+  amount: 5000
+});
+
+// Create workspace API key
+const key = await client.enterprise.workspaces.createKey('ws_xxx', {
+  name: 'Production',
+  type: 'live'
+});
+console.log(key.rawKey); // shown once
+
+// Revoke a key
+await client.enterprise.workspaces.revokeKey('ws_xxx', 'key_abc');
+```
+
+### Webhooks & Analytics
+
+```typescript
+// Set enterprise webhook
+await client.enterprise.webhooks.set({ url: 'https://yourapp.com/webhooks' });
+
+// Analytics
+const overview = await client.enterprise.analytics.overview();
+const messages = await client.enterprise.analytics.messages({ period: '30d' });
+const delivery = await client.enterprise.analytics.delivery();
+```
+
+Full enterprise docs: [sendly.live/docs/enterprise](https://sendly.live/docs/enterprise)
 
 ## Support
 
