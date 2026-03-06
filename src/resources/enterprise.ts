@@ -70,6 +70,8 @@ class WorkspacesSubResource {
     workspaces: EnterpriseWorkspace[];
     maxWorkspaces: number;
     workspacesUsed: number;
+    pagination?: { page: number; limit: number; total: number; totalPages: number };
+    summary?: { totalCredits: number; totalMessages30d: number; verified: number; pending: number; unverified: number };
   }> {
     const response = await this.http.request<unknown>({
       method: "GET",
