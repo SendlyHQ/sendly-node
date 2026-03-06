@@ -1,5 +1,29 @@
 # @sendly/node
 
+## 3.18.2
+
+### Patch Changes
+
+- [`d14f11b`](https://github.com/SendlyHQ/sendly/commit/d14f11b67e076a050fc5c1d1f95c00b7078243b1) Thanks [@sendly-live](https://github.com/sendly-live)! - fix: webhook signature verification and payload parsing across all SDKs
+  - All 7 non-Node SDKs now correctly verify webhook signatures using `timestamp.payload` HMAC format
+  - Webhook payload parsing handles `data.object` nesting (with flat `data` fallback)
+  - Added `livemode` field to WebhookEvent across all SDKs
+  - Added `direction`, `organizationId`, `text`, `messageFormat` fields to WebhookMessageData
+  - Backwards compatible: old 3-arg verify_signature() still works, message_id aliased to id
+  - Documentation fixes: webhook payloads, signature verification, opt-out events, PHP imports, Java namespaces
+  - Added 8 missing pages to docs search, updated llms.txt
+
+## 3.18.1
+
+### Patch Changes
+
+- fix: webhook verification and payload parsing across all 7 non-Node SDKs (Python, PHP, Go, Ruby, Java, Rust, .NET)
+  - Signature verification now uses `timestamp.payload` HMAC format matching server
+  - Payload parsing handles `data.object` nesting with flat `data` fallback
+  - Added `livemode`, `direction`, `organizationId`, `text`, `messageFormat` fields
+  - Documentation: fixed webhook payloads, signature docs, opt-out events, PHP imports, Java namespaces
+  - Added 8 missing pages to docs search, updated llms.txt
+
 ## 3.18.0
 
 ### Minor Changes
