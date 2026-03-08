@@ -20,6 +20,7 @@ export interface HttpClientConfig {
   baseUrl: string;
   timeout: number;
   maxRetries: number;
+  organizationId?: string;
 }
 
 /**
@@ -28,6 +29,7 @@ export interface HttpClientConfig {
 export class HttpClient {
   private readonly config: HttpClientConfig;
   private rateLimitInfo?: RateLimitInfo;
+  public organizationId?: string;
 
   constructor(config: Partial<HttpClientConfig> & { apiKey: string }) {
     this.config = {
@@ -36,6 +38,8 @@ export class HttpClient {
       timeout: config.timeout || DEFAULT_TIMEOUT,
       maxRetries: config.maxRetries ?? DEFAULT_MAX_RETRIES,
     };
+
+    this.organizationId = config.organizationId || process.env.SENDLY_ORG_ID || undefined;
 
     // Validate API key format
     if (!this.isValidApiKey(this.config.apiKey)) {
@@ -284,13 +288,19 @@ export class HttpClient {
   private buildHeaders(
     additionalHeaders?: Record<string, string>,
   ): Record<string, string> {
-    return {
+    const headers: Record<string, string> = {
       Authorization: `Bearer ${this.config.apiKey}`,
       "Content-Type": "application/json",
       Accept: "application/json",
       "User-Agent": "@sendly/node/1.0.5",
       ...additionalHeaders,
     };
+
+    if (this.organizationId) {
+      headers["X-Organization-Id"] = this.organizationId;
+    }
+
+    return headers;
   }
 
   /**

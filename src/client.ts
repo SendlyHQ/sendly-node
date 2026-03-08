@@ -261,6 +261,7 @@ export class Sendly {
       baseUrl: this.config.baseUrl,
       timeout: this.config.timeout,
       maxRetries: this.config.maxRetries,
+      organizationId: typeof configOrApiKey === "string" ? undefined : configOrApiKey.organizationId,
     });
 
     // Initialize resources
@@ -318,6 +319,10 @@ export class Sendly {
    */
   getBaseUrl(): string {
     return this.config.baseUrl;
+  }
+
+  setOrganizationId(id: string): void {
+    this.http.organizationId = id;
   }
 }
 

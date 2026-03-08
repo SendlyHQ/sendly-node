@@ -33,6 +33,8 @@ export interface SendlyConfig {
    * @default 3
    */
   maxRetries?: number;
+
+  organizationId?: string;
 }
 
 // ============================================================================
