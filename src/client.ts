@@ -230,7 +230,7 @@ export class Sendly {
   public readonly enterprise: EnterpriseResource;
 
   private readonly http: HttpClient;
-  private readonly config: Required<SendlyConfig>;
+  private readonly config: Required<Pick<SendlyConfig, "apiKey" | "baseUrl" | "timeout" | "maxRetries">> & Pick<SendlyConfig, "organizationId">;
 
   /**
    * Create a new Sendly client
