@@ -1,5 +1,11 @@
 # @sendly/node
 
+## 3.19.0
+
+### Minor Changes
+
+- [`ccd8f05`](https://github.com/SendlyHQ/sendly/commit/ccd8f05c0e7b9576ef38748ef7667b24e0d7db11) Thanks [@sendly-live](https://github.com/sendly-live)! - Add organization support to all SDKs with X-Organization-Id header, setOrganizationId() method, and SENDLY_ORG_ID environment variable fallback
+
 ## 3.18.2
 
 ### Patch Changes
