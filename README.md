@@ -9,7 +9,7 @@
 
 # @sendly/node
 
-Official Node.js SDK for the [Sendly](https://sendly.live) SMS API.
+Official Node.js SDK for the [Sendly](https://sendly.live) SMS & MMS API.
 
 ## Installation
 
