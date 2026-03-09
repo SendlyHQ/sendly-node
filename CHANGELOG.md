@@ -1,5 +1,11 @@
 # @sendly/node
 
+## 3.19.1
+
+### Patch Changes
+
+- [`c3c412c`](https://github.com/SendlyHQ/sendly/commit/c3c412c02c4f0d8b6ccee21d70add9c3a83c3220) Thanks [@sendly-live](https://github.com/sendly-live)! - Fix enterprise provision response types to match actual API response shape (workspace/key fields)
+
 ## 3.19.0
 
 ### Minor Changes
