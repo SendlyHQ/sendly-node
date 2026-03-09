@@ -2071,11 +2071,12 @@ export interface ProvisionWorkspaceResult {
     balance: number;
     transferred?: number;
   };
-  apiKey?: {
+  key?: {
     id: string;
     name: string;
-    prefix: string;
-    key?: string;
+    key: string;
+    keyPrefix: string;
+    type: string;
   };
   optInPage?: {
     url: string;

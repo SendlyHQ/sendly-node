@@ -621,14 +621,14 @@ const result = await client.enterprise.provision({
   name: 'Acme Insurance - Austin',
   sourceWorkspaceId: 'ws_verified',
   creditAmount: 5000,
-  creditSourceWorkspaceId: 'ws_pool',
+  creditSourceWorkspaceId: 'SOURCE_WORKSPACE_ID',
   keyName: 'Production',
   keyType: 'live',
   generateOptInPage: true
 });
 
 console.log(result.workspace.id);
-console.log(result.apiKey?.rawKey);  // shown once
+console.log(result.key?.key);  // shown once
 console.log(result.optInPage?.url);  // hosted opt-in page
 ```
 
@@ -698,7 +698,7 @@ const key = await client.enterprise.workspaces.createKey('ws_xxx', {
   name: 'Production',
   type: 'live'
 });
-console.log(key.rawKey); // shown once
+console.log(key.key); // shown once
 
 // Revoke a key
 await client.enterprise.workspaces.revokeKey('ws_xxx', 'key_abc');
