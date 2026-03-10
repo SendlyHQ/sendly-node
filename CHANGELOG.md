@@ -1,5 +1,16 @@
 # @sendly/node
 
+## 3.20.0
+
+### Minor Changes
+
+- [`bec79af`](https://github.com/SendlyHQ/sendly/commit/bec79af3df211f3dce5e5e43b8dabad6138b1c3d) Thanks [@sendly-live](https://github.com/sendly-live)! - Enterprise credits pool, SDK endpoint fixes, and security hardening
+  - Added `enterprise.credits.get()` to retrieve pool balance
+  - Added `enterprise.credits.deposit(amount, description)` to deposit credits into enterprise pool
+  - Fixed credits endpoint paths across all 8 SDKs (`/credits/pool` → `/credits`)
+  - Fixed CLI quota commands to use `monthlyMessageQuota` field (was incorrectly sending `monthlyLimit`)
+  - Stripped webhook signing secret and invitation tokens from API responses
+
 ## 3.19.1
 
 ### Patch Changes
