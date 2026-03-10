@@ -600,7 +600,7 @@ class CreditsSubResource {
   async get(): Promise<{ balance: number; lifetimeCredits: number; reservedBalance: number }> {
     const response = await this.http.request<unknown>({
       method: "GET",
-      path: "/enterprise/credits/pool",
+      path: "/enterprise/credits",
     });
 
     return transformKeys(response) as { balance: number; lifetimeCredits: number; reservedBalance: number };
@@ -614,7 +614,7 @@ class CreditsSubResource {
 
     const response = await this.http.request<unknown>({
       method: "POST",
-      path: "/enterprise/credits/pool/deposit",
+      path: "/enterprise/credits/deposit",
       body,
     });
 
