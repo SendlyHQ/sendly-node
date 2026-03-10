@@ -590,6 +590,38 @@ class SettingsSubResource {
   }
 }
 
+class CreditsSubResource {
+  private readonly http: HttpClient;
+
+  constructor(http: HttpClient) {
+    this.http = http;
+  }
+
+  async get(): Promise<{ balance: number; lifetimeCredits: number; reservedBalance: number }> {
+    const response = await this.http.request<unknown>({
+      method: "GET",
+      path: "/enterprise/credits/pool",
+    });
+
+    return transformKeys(response) as { balance: number; lifetimeCredits: number; reservedBalance: number };
+  }
+
+  async deposit(amount: number, description?: string): Promise<{ balance: number; lifetimeCredits: number }> {
+    const body: Record<string, unknown> = { amount };
+    if (description !== undefined) {
+      body.description = description;
+    }
+
+    const response = await this.http.request<unknown>({
+      method: "POST",
+      path: "/enterprise/credits/pool/deposit",
+      body,
+    });
+
+    return transformKeys(response) as { balance: number; lifetimeCredits: number };
+  }
+}
+
 class BillingSubResource {
   private readonly http: HttpClient;
 
@@ -620,6 +652,7 @@ export class EnterpriseResource {
   public readonly analytics: AnalyticsSubResource;
   public readonly settings: SettingsSubResource;
   public readonly billing: BillingSubResource;
+  public readonly credits: CreditsSubResource;
 
   constructor(http: HttpClient) {
     this.http = http;
@@ -628,6 +661,7 @@ export class EnterpriseResource {
     this.analytics = new AnalyticsSubResource(http);
     this.settings = new SettingsSubResource(http);
     this.billing = new BillingSubResource(http);
+    this.credits = new CreditsSubResource(http);
   }
 
   async getAccount(): Promise<EnterpriseAccount> {
