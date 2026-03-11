@@ -498,6 +498,15 @@ class WebhooksSubResource {
 
     return transformKeys<EnterpriseWebhookTestResult>(response);
   }
+
+  async rotateSecret(): Promise<EnterpriseWebhook> {
+    const response = await this.http.request<unknown>({
+      method: "POST",
+      path: "/enterprise/webhooks/rotate-secret",
+    });
+
+    return transformKeys<EnterpriseWebhook>(response);
+  }
 }
 
 class AnalyticsSubResource {
