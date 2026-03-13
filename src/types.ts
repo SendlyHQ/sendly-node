@@ -940,7 +940,17 @@ export type WebhookEventType =
   | "message.failed"
   | "message.bounced"
   | "message.retrying"
-  | "message.queued";
+  | "message.queued"
+  | "message.received"
+  | "message.opt_out"
+  | "message.opt_in"
+  | "verification.created"
+  | "verification.delivered"
+  | "verification.verified"
+  | "verification.expired"
+  | "verification.failed"
+  | "verification.resent"
+  | "verification.delivery_failed";
 
 /**
  * Webhook mode - filters which events are delivered
@@ -974,6 +984,14 @@ export interface WebhookEventData {
   segments: number;
   /** Credits used */
   credits_used: number;
+  organization_id?: string | null;
+  text?: string;
+  direction?: "outbound" | "inbound";
+  created_at?: number | string;
+  retry_count?: number;
+  metadata?: Record<string, any>;
+  message_format?: "sms" | "mms";
+  media_urls?: string[];
 }
 
 /**

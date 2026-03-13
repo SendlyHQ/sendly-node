@@ -48,6 +48,25 @@ export interface WebhookMessageObject {
   error?: string;
   /** Custom metadata attached to the message */
   metadata?: Record<string, unknown>;
+  organization_id?: string | null;
+  retry_count?: number;
+}
+
+export interface WebhookVerificationObject {
+  id: string;
+  organization_id?: string | null;
+  phone: string;
+  status: string;
+  delivery_status: string;
+  attempts: number;
+  max_attempts: number;
+  expires_at: number;
+  verified_at?: number;
+  created_at: number;
+  app_name?: string;
+  template_id?: string;
+  profile_id?: string;
+  metadata?: Record<string, unknown>;
 }
 
 /**
