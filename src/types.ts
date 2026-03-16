@@ -245,6 +245,74 @@ export interface MessageListResponse {
 }
 
 // ============================================================================
+// Conversations
+// ============================================================================
+
+export type ConversationStatus = "active" | "closed";
+
+export interface Conversation {
+  id: string;
+  phoneNumber: string;
+  status: ConversationStatus;
+  unreadCount: number;
+  messageCount: number;
+  lastMessageText: string | null;
+  lastMessageAt: string | null;
+  lastMessageDirection: "inbound" | "outbound" | null;
+  metadata: Record<string, any>;
+  tags: string[];
+  contactId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ListConversationsOptions {
+  limit?: number;
+  offset?: number;
+  status?: ConversationStatus;
+}
+
+export interface ConversationListResponse {
+  data: Conversation[];
+  pagination: {
+    total: number;
+    limit: number;
+    offset: number;
+    hasMore: boolean;
+  };
+}
+
+export interface ConversationWithMessages extends Conversation {
+  messages?: {
+    data: Message[];
+    pagination: {
+      total: number;
+      limit: number;
+      offset: number;
+      hasMore: boolean;
+    };
+  };
+}
+
+export interface GetConversationOptions {
+  includeMessages?: boolean;
+  messageLimit?: number;
+  messageOffset?: number;
+}
+
+export interface UpdateConversationRequest {
+  metadata?: Record<string, any>;
+  tags?: string[];
+}
+
+export interface ReplyToConversationRequest {
+  text: string;
+  messageType?: MessageType;
+  metadata?: Record<string, any>;
+  mediaUrls?: string[];
+}
+
+// ============================================================================
 // Media
 // ============================================================================
 

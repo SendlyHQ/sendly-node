@@ -14,6 +14,7 @@ import { CampaignsResource } from "./resources/campaigns";
 import { ContactsResource } from "./resources/contacts";
 import { MediaResource } from "./resources/media";
 import { EnterpriseResource } from "./resources/enterprise";
+import { ConversationsResource } from "./resources/conversations";
 
 const DEFAULT_BASE_URL = "https://sendly.live/api/v1";
 const DEFAULT_TIMEOUT = 30000;
@@ -67,6 +68,7 @@ export class Sendly {
    * ```
    */
   public readonly messages: MessagesResource;
+  public readonly conversations: ConversationsResource;
 
   /**
    * Webhooks API resource
@@ -266,6 +268,7 @@ export class Sendly {
 
     // Initialize resources
     this.messages = new MessagesResource(this.http);
+    this.conversations = new ConversationsResource(this.http);
     this.webhooks = new WebhooksResource(this.http);
     this.account = new AccountResource(this.http);
     this.verify = new VerifyResource(this.http);
