@@ -180,6 +180,18 @@ export type {
   UpdateQuotaOptions,
 } from "./types";
 
+// Types - Conversations
+export type {
+  ConversationStatus,
+  Conversation,
+  ListConversationsOptions,
+  ConversationListResponse,
+  ConversationWithMessages,
+  GetConversationOptions,
+  UpdateConversationRequest,
+  ReplyToConversationRequest,
+} from "./types";
+
 // Constants
 export {
   CREDITS_PER_SMS,
