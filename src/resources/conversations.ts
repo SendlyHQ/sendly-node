@@ -45,7 +45,7 @@ export class ConversationsResource {
     return this.http.request<Message>({
       method: "POST",
       path: `/conversations/${conversationId}/messages`,
-      body: request,
+      body: { ...request },
     });
   }
 
@@ -53,7 +53,7 @@ export class ConversationsResource {
     return this.http.request<Conversation>({
       method: "PATCH",
       path: `/conversations/${id}`,
-      body: request,
+      body: { ...request },
     });
   }
 
