@@ -177,7 +177,7 @@ export interface Message {
   senderType?: SenderType;
 
   /**
-   * Telnyx message ID for tracking
+   * Carrier message ID for tracking
    */
   telnyxMessageId?: string | null;
 
@@ -205,6 +205,18 @@ export interface Message {
    * Custom JSON metadata attached to the message
    */
   metadata?: Record<string, any>;
+
+  /**
+   * AI classification metadata (inbound messages only, when AI classification is enabled)
+   */
+  aiMetadata?: {
+    intent: string;
+    intentConfidence: number;
+    sentiment: string;
+    sentimentConfidence: number;
+    classifiedAt: string;
+    model: string;
+  } | null;
 }
 
 /**
