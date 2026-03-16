@@ -258,7 +258,7 @@ export class MessagesResource {
       validateSenderId(request.from);
     }
 
-    // Validate scheduledAt is in the future (Telnyx requires 5 min - 5 days)
+    // Validate scheduledAt is in the future (carrier requires 5 min - 5 days)
     const scheduledTime = new Date(request.scheduledAt);
     const now = new Date();
     const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000);
