@@ -324,6 +324,17 @@ export interface ReplyToConversationRequest {
   mediaUrls?: string[];
 }
 
+export interface SuggestedReply {
+  text: string;
+  tone: "professional" | "friendly" | "concise";
+}
+
+export interface SuggestRepliesResponse {
+  suggestions: SuggestedReply[];
+  basedOnMessageId?: string;
+  model?: string;
+}
+
 // ============================================================================
 // Media
 // ============================================================================

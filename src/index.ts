@@ -190,6 +190,8 @@ export type {
   GetConversationOptions,
   UpdateConversationRequest,
   ReplyToConversationRequest,
+  SuggestedReply,
+  SuggestRepliesResponse,
 } from "./types";
 
 // Constants

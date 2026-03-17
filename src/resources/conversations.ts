@@ -7,6 +7,7 @@ import type {
   GetConversationOptions,
   UpdateConversationRequest,
   ReplyToConversationRequest,
+  SuggestRepliesResponse,
   Message,
 } from "../types";
 
@@ -75,6 +76,13 @@ export class ConversationsResource {
     return this.http.request<Conversation>({
       method: "POST",
       path: `/conversations/${id}/reopen`,
+    });
+  }
+
+  async suggestReplies(conversationId: string): Promise<SuggestRepliesResponse> {
+    return this.http.request<SuggestRepliesResponse>({
+      method: "POST",
+      path: `/conversations/${conversationId}/suggest-replies`,
     });
   }
 }
