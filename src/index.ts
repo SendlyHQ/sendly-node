@@ -192,6 +192,16 @@ export type {
   ReplyToConversationRequest,
   SuggestedReply,
   SuggestRepliesResponse,
+  Label,
+  LabelListResponse,
+  CreateLabelRequest,
+  AddLabelsRequest,
+  DraftStatus,
+  MessageDraft,
+  CreateDraftRequest,
+  UpdateDraftRequest,
+  DraftListResponse,
+  ListDraftsOptions,
 } from "./types";
 
 // Constants

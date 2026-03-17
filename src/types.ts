@@ -336,6 +336,81 @@ export interface SuggestRepliesResponse {
 }
 
 // ============================================================================
+// Labels
+// ============================================================================
+
+export interface Label {
+  id: string;
+  name: string;
+  color: string;
+  description?: string | null;
+  createdAt: string;
+}
+
+export interface LabelListResponse {
+  data: Label[];
+}
+
+export interface CreateLabelRequest {
+  name: string;
+  color?: string;
+  description?: string;
+}
+
+export interface AddLabelsRequest {
+  labelIds: string[];
+}
+
+// ============================================================================
+// Drafts
+// ============================================================================
+
+export type DraftStatus = "pending" | "approved" | "rejected" | "sent" | "failed";
+
+export interface MessageDraft {
+  id: string;
+  conversationId: string;
+  text: string;
+  mediaUrls?: string[];
+  metadata?: Record<string, any>;
+  status: DraftStatus;
+  source?: string;
+  createdBy?: string;
+  reviewedBy?: string;
+  reviewedAt?: string | null;
+  rejectionReason?: string | null;
+  messageId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateDraftRequest {
+  conversationId: string;
+  text: string;
+  mediaUrls?: string[];
+  metadata?: Record<string, any>;
+  source?: string;
+}
+
+export interface UpdateDraftRequest {
+  text?: string;
+  mediaUrls?: string[];
+  metadata?: Record<string, any>;
+}
+
+export interface DraftListResponse {
+  data: MessageDraft[];
+  pagination: { total: number };
+}
+
+export interface ListDraftsOptions {
+  conversationId?: string;
+  status?: DraftStatus;
+  limit?: number;
+  offset?: number;
+}
+
+// ============================================================================
 // Media
 // ============================================================================
 

@@ -8,6 +8,7 @@ import type {
   UpdateConversationRequest,
   ReplyToConversationRequest,
   SuggestRepliesResponse,
+  LabelListResponse,
   Message,
 } from "../types";
 
@@ -83,6 +84,21 @@ export class ConversationsResource {
     return this.http.request<SuggestRepliesResponse>({
       method: "POST",
       path: `/conversations/${conversationId}/suggest-replies`,
+    });
+  }
+
+  async addLabels(conversationId: string, labelIds: string[]): Promise<LabelListResponse> {
+    return this.http.request<LabelListResponse>({
+      method: "POST",
+      path: `/conversations/${conversationId}/labels`,
+      body: { labelIds },
+    });
+  }
+
+  async removeLabel(conversationId: string, labelId: string): Promise<void> {
+    await this.http.request<void>({
+      method: "DELETE",
+      path: `/conversations/${conversationId}/labels/${labelId}`,
     });
   }
 }
