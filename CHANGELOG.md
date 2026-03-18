@@ -1,5 +1,18 @@
 # @sendly/node
 
+## 3.24.0
+
+### Minor Changes
+
+- [`6f2406e`](https://github.com/SendlyHQ/sendly/commit/6f2406e6da409798cef11ef18ccfc50302ab443d) Thanks [@sendly-live](https://github.com/sendly-live)! - Conversations API, AI intelligence, Labels, and Drafts across all SDKs.
+  - Conversations: list, get, reply, update, close, reopen, markRead, suggestReplies, addLabels, removeLabel
+  - AI classification (aiMetadata) on Message type — intent + sentiment on inbound messages
+  - AI suggested replies — 2-3 tone-varied suggestions per conversation
+  - Labels: create, list, delete — categorize conversations and messages
+  - Drafts: create, list, get, update, approve, reject — human-in-the-loop message approval
+  - CLI: `sendly conversations`, `sendly labels`, `sendly drafts` command groups
+  - MCP Server: 25 tools (messaging, conversations, labels, drafts, OTP, account)
+
 ## 3.20.0
 
 ### Minor Changes
