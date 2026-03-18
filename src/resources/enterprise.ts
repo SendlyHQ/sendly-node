@@ -725,4 +725,26 @@ export class EnterpriseResource {
 
     return transformKeys(response) as ProvisionWorkspaceResult;
   }
+
+  async generateBusinessPage(options: {
+    businessName: string;
+    useCase?: string;
+    useCaseSummary?: string;
+    contactEmail?: string;
+    contactPhone?: string;
+    businessAddress?: string;
+    socialUrl?: string;
+  }): Promise<{ slug: string; url: string; pageId: string }> {
+    const response = await this.http.request<{
+      slug: string;
+      url: string;
+      pageId: string;
+    }>({
+      method: "POST",
+      path: "/verification/business-page/generate",
+      body: options,
+    });
+
+    return response;
+  }
 }
