@@ -40,6 +40,8 @@ import type {
   Invitation,
   QuotaSettings,
   UpdateQuotaOptions,
+  GenerateBusinessPageOptions,
+  GenerateBusinessPageResponse,
 } from "../types";
 
 class WorkspacesSubResource {
@@ -726,23 +728,15 @@ export class EnterpriseResource {
     return transformKeys(response) as ProvisionWorkspaceResult;
   }
 
-  async generateBusinessPage(options: {
-    businessName: string;
-    useCase?: string;
-    useCaseSummary?: string;
-    contactEmail?: string;
-    contactPhone?: string;
-    businessAddress?: string;
-    socialUrl?: string;
-  }): Promise<{ slug: string; url: string; pageId: string }> {
-    const response = await this.http.request<{
-      slug: string;
-      url: string;
-      pageId: string;
-    }>({
+  async generateBusinessPage(options: GenerateBusinessPageOptions): Promise<GenerateBusinessPageResponse> {
+    if (!options.businessName || options.businessName.trim().length === 0) {
+      throw new Error("businessName is required");
+    }
+
+    const response = await this.http.request<GenerateBusinessPageResponse>({
       method: "POST",
       path: "/verification/business-page/generate",
-      body: options,
+      body: { ...options } as Record<string, unknown>,
     });
 
     return response;

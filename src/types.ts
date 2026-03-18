@@ -2545,3 +2545,19 @@ export interface QuotaSettings {
 export interface UpdateQuotaOptions {
   monthlyMessageQuota: number | null;
 }
+
+export interface GenerateBusinessPageOptions {
+  businessName: string;
+  useCase?: string;
+  useCaseSummary?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  businessAddress?: string;
+  socialUrl?: string;
+}
+
+export interface GenerateBusinessPageResponse {
+  slug: string;
+  url: string;
+  pageId: string;
+}

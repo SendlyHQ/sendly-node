@@ -178,6 +178,8 @@ export type {
   Invitation,
   QuotaSettings,
   UpdateQuotaOptions,
+  GenerateBusinessPageOptions,
+  GenerateBusinessPageResponse,
 } from "./types";
 
 // Types - Conversations
