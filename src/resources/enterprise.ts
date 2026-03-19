@@ -718,6 +718,9 @@ export class EnterpriseResource {
     if (options.generateOptInPage !== undefined) {
       body.generateOptInPage = options.generateOptInPage;
     }
+    if (options.generateBusinessPage !== undefined) {
+      body.generateBusinessPage = options.generateBusinessPage;
+    }
 
     const response = await this.http.request<ProvisionWorkspaceResult>({
       method: "POST",

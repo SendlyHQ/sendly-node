@@ -2235,6 +2235,7 @@ export interface ProvisionWorkspaceOptions {
   keyType?: "test" | "live";
   webhookUrl?: string;
   generateOptInPage?: boolean;
+  generateBusinessPage?: boolean;
 }
 
 export interface ProvisionWorkspaceResult {
