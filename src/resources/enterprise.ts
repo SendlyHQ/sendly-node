@@ -735,7 +735,7 @@ export class EnterpriseResource {
 
     const response = await this.http.request<GenerateBusinessPageResponse>({
       method: "POST",
-      path: "/verification/business-page/generate",
+      path: "/enterprise/business-page/generate",
       body: { ...options } as Record<string, unknown>,
     });
 
