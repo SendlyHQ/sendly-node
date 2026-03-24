@@ -2562,3 +2562,14 @@ export interface GenerateBusinessPageResponse {
   url: string;
   pageId: string;
 }
+
+export interface UploadVerificationDocumentOptions {
+  workspaceId?: string;
+  verificationId?: string;
+  filename?: string;
+}
+
+export interface UploadVerificationDocumentResponse {
+  url: string;
+  id: string;
+}

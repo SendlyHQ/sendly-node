@@ -744,4 +744,30 @@ export class EnterpriseResource {
 
     return response;
   }
+
+  async uploadVerificationDocument(
+    file: Buffer | Blob,
+    options?: { workspaceId?: string; verificationId?: string; filename?: string },
+  ): Promise<{ url: string; id: string }> {
+    const formData = new FormData();
+
+    if (file instanceof Blob) {
+      formData.append("file", file, options?.filename || "document");
+    } else {
+      const blob = new Blob([file]);
+      formData.append("file", blob, options?.filename || "document");
+    }
+
+    if (options?.workspaceId) {
+      formData.append("workspaceId", options.workspaceId);
+    }
+    if (options?.verificationId) {
+      formData.append("verificationId", options.verificationId);
+    }
+
+    return this.http.requestFormData<{ url: string; id: string }>(
+      "/enterprise/verification-document/upload",
+      formData,
+    );
+  }
 }
