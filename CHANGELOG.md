@@ -1,5 +1,11 @@
 # @sendly/node
 
+## 3.25.0
+
+### Minor Changes
+
+- [`80ca04c`](https://github.com/SendlyHQ/sendly/commit/80ca04c91ba51f4c292c6373cd0325e890525a67) Thanks [@sendly-live](https://github.com/sendly-live)! - EIN/BRN document upload for verification, business page generation on provisioning, AI integration (badges, template generation, conversation summaries), verification document upload across all SDKs + CLI.
+
 ## 3.24.0
 
 ### Minor Changes
