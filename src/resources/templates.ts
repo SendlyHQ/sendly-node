@@ -10,6 +10,8 @@ import type {
   UpdateTemplateRequest,
   TemplateListResponse,
   TemplatePreview,
+  GenerateTemplateRequest,
+  GeneratedTemplate,
 } from "../types";
 
 /**
@@ -402,5 +404,13 @@ export class TemplatesResource {
       createdAt: t.created_at,
       updatedAt: t.updated_at,
     };
+  }
+
+  async generate(request: GenerateTemplateRequest): Promise<GeneratedTemplate> {
+    return this.http.request<GeneratedTemplate>({
+      method: "POST",
+      path: "/templates/generate",
+      body: { ...request },
+    });
   }
 }

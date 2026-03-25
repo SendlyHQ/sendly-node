@@ -335,6 +335,80 @@ export interface SuggestRepliesResponse {
   model?: string;
 }
 
+export interface ConversationContext {
+  context: string;
+  conversation: {
+    id: string;
+    phoneNumber: string;
+    status: string;
+    messageCount: number;
+    unreadCount: number;
+  };
+  tokenEstimate: number;
+  business?: {
+    name: string;
+    useCase?: string;
+  };
+}
+
+// ============================================================================
+// Auto-Label Rules
+// ============================================================================
+
+export interface AutoLabelRule {
+  id: string;
+  name: string;
+  conditions: {
+    intent?: string | string[];
+    sentiment?: string | string[];
+    intentConfidenceMin?: number;
+    sentimentConfidenceMin?: number;
+  };
+  actions: {
+    addLabels: string[];
+    closeConversation?: boolean;
+  };
+  enabled: boolean;
+  priority: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AutoLabelRuleListResponse {
+  data: AutoLabelRule[];
+}
+
+export interface CreateAutoLabelRuleRequest {
+  name: string;
+  conditions: AutoLabelRule["conditions"];
+  actions: AutoLabelRule["actions"];
+  priority?: number;
+}
+
+export interface UpdateAutoLabelRuleRequest {
+  name?: string;
+  conditions?: AutoLabelRule["conditions"];
+  actions?: AutoLabelRule["actions"];
+  enabled?: boolean;
+  priority?: number;
+}
+
+// ============================================================================
+// Template Generation
+// ============================================================================
+
+export interface GenerateTemplateRequest {
+  description: string;
+  category?: string;
+}
+
+export interface GeneratedTemplate {
+  name: string;
+  text: string;
+  variables: string[];
+  category: string;
+}
+
 // ============================================================================
 // Labels
 // ============================================================================

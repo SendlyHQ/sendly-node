@@ -8,6 +8,7 @@ import type {
   UpdateConversationRequest,
   ReplyToConversationRequest,
   SuggestRepliesResponse,
+  ConversationContext,
   LabelListResponse,
   Message,
 } from "../types";
@@ -77,6 +78,16 @@ export class ConversationsResource {
     return this.http.request<Conversation>({
       method: "POST",
       path: `/conversations/${id}/reopen`,
+    });
+  }
+
+  async getContext(conversationId: string, options?: { maxMessages?: number }): Promise<ConversationContext> {
+    const params = new URLSearchParams();
+    if (options?.maxMessages) params.set("max_messages", String(options.maxMessages));
+    const qs = params.toString();
+    return this.http.request<ConversationContext>({
+      method: "GET",
+      path: `/conversations/${conversationId}/context${qs ? `?${qs}` : ""}`,
     });
   }
 

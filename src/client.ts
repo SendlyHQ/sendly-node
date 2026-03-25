@@ -17,6 +17,7 @@ import { EnterpriseResource } from "./resources/enterprise";
 import { ConversationsResource } from "./resources/conversations";
 import { LabelsResource } from "./resources/labels";
 import { DraftsResource } from "./resources/drafts";
+import { RulesResource } from "./resources/rules";
 
 const DEFAULT_BASE_URL = "https://sendly.live/api/v1";
 const DEFAULT_TIMEOUT = 30000;
@@ -73,6 +74,7 @@ export class Sendly {
   public readonly conversations: ConversationsResource;
   public readonly labels: LabelsResource;
   public readonly drafts: DraftsResource;
+  public readonly rules: RulesResource;
 
   /**
    * Webhooks API resource
@@ -275,6 +277,7 @@ export class Sendly {
     this.conversations = new ConversationsResource(this.http);
     this.labels = new LabelsResource(this.http);
     this.drafts = new DraftsResource(this.http);
+    this.rules = new RulesResource(this.http);
     this.webhooks = new WebhooksResource(this.http);
     this.account = new AccountResource(this.http);
     this.verify = new VerifyResource(this.http);
