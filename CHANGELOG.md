@@ -1,5 +1,11 @@
 # @sendly/node
 
+## 3.26.0
+
+### Minor Changes
+
+- Auto-label rules UI, natural language scheduling in CLI, interactive prompts for SMS send/schedule, MCP tool updates (29 tools), and documentation for Labels, Drafts, and AI Features.
+
 ## 3.25.0
 
 ### Minor Changes
