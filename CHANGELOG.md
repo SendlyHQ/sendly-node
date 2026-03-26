@@ -1,5 +1,16 @@
 # @sendly/node
 
+## 3.27.0
+
+### Minor Changes
+
+- [`86a30de`](https://github.com/SendlyHQ/sendly/commit/86a30de1d43fafa7afb2601d17228f50ef1a3c08) Thanks [@sendly-live](https://github.com/sendly-live)! - AI features: conversation context API, auto-labeling rules, template generation.
+  All 8 SDKs updated with getContext(), rules CRUD, templates.generate().
+  MCP server: 29 tools, security hardened, v1.2.0.
+  Enterprise dashboard: burn rate, segment breakdown, transaction log.
+  CLI: natural language scheduling, interactive prompts, rules/events/context commands.
+  Docs: full Divio-structured AI documentation with 9 sub-pages.
+
 ## 3.26.0
 
 ### Minor Changes
