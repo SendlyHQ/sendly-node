@@ -27,10 +27,20 @@
   "keywords": [
     "sendly",
     "sms",
+    "sms-api",
     "messaging",
-    "api",
-    "text",
-    "notifications"
+    "text-message",
+    "notifications",
+    "otp",
+    "phone-verification",
+    "bulk-sms",
+    "sms-gateway",
+    "twilio-alternative",
+    "mms",
+    "campaigns",
+    "webhooks",
+    "typescript",
+    "nodejs"
   ],
   "author": "Sendly <support@sendly.live>",
   "license": "MIT",
