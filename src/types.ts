@@ -763,9 +763,9 @@ export interface BatchMessageRequest {
  */
 export interface BatchMessageResult {
   /**
-   * Message ID (if successful)
+   * Message ID
    */
-  id?: string;
+  id: string;
 
   /**
    * Destination phone number
@@ -773,14 +773,24 @@ export interface BatchMessageResult {
   to: string;
 
   /**
-   * Status of this message
+   * Current message status
    */
-  status: "queued" | "failed";
+  status: string;
 
   /**
    * Error message (if failed)
    */
-  error?: string;
+  error?: string | null;
+
+  /**
+   * When the message was created
+   */
+  createdAt?: string;
+
+  /**
+   * When the message was delivered (if applicable)
+   */
+  deliveredAt?: string | null;
 }
 
 /**
