@@ -1242,6 +1242,7 @@ export interface WebhookEventData {
   metadata?: Record<string, any>;
   message_format?: "sms" | "mms";
   media_urls?: string[];
+  batch_id?: string | null;
 }
 
 /**
