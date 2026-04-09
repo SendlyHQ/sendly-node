@@ -1,5 +1,28 @@
 # @sendly/node
 
+## 3.27.2
+
+### Patch Changes
+
+- [`343d1e2`](https://github.com/SendlyHQ/sendly/commit/343d1e2ba452e4280a386f29e56577d03eb8af11) Thanks [@sendly-live](https://github.com/sendly-live)! - Verify API contract fixes — server response fields, resend profile lookup, and broken non-Node SDKs.
+
+  **Server fixes:**
+  - `POST /verify/:id/check` now returns `remaining_attempts` on `invalid_code` errors (was missing — SDKs already typed it as expected)
+  - `POST /verify/:id/resend` now respects verify profile settings (`code_length`, `timeout_secs`, `max_attempts`, `app_name`) instead of silently downgrading to defaults
+  - `GET /verify/:id` and `GET /verify` (list) now return `app_name`, `template_id`, `profile_id`
+
+  **SDK fixes (pre-existing bugs since launch):**
+  - Ruby: rewritten — was sending camelCase params and fake fields (`channel`, `locale`, `expiresIn`, `metadata`), expected wrapper response server never sent
+  - Rust: rewritten — same camelCase serde renames and wrapper response issues
+  - C# (.NET): rewritten Models — `Phone` instead of `To`, fake fields, expected wrapper, missing `RemainingAttempts`
+  - PHP: docblock cleanup — were documenting camelCase keys and fake fields
+
+  **CLI:**
+  - `verify list`/`status`: add missing optional fields (`app_name`, `template_id`, `profile_id`)
+  - `verify list`: fix pagination shape mismatch, remove non-functional `--page`/`--offset` flags
+
+  All response shapes now match the documented REST API. Verified live in production. 142 existing verifications unchanged.
+
 ## 3.27.0
 
 ### Minor Changes
