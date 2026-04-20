@@ -2013,6 +2013,37 @@ export interface Contact {
   optedOut?: boolean;
 
   /**
+   * Carrier-reported line type for this number. One of: `mobile`, `voip`,
+   * `toll free`, `fixed line`, `fixed line or mobile`, `pager`, `voicemail`,
+   * `shared cost`, `premium rate`, `uan`, `personal number`, `unknown`.
+   * Populated after a carrier lookup (either automatic or via checkNumbers).
+   */
+  lineType?: string | null;
+
+  /**
+   * Carrier name reported by the lookup (e.g., "AT&T", "Verizon").
+   */
+  carrierName?: string | null;
+
+  /**
+   * When the carrier lookup last ran for this contact.
+   */
+  lineTypeCheckedAt?: string | null;
+
+  /**
+   * Reason this contact is excluded from future campaigns. One of:
+   * `landline`, `invalid_number`, `non_sms_capable`. Set automatically
+   * after terminal send failures or by a carrier lookup. Clear it with
+   * `contacts.markValid(id)`.
+   */
+  invalidReason?: string | null;
+
+  /**
+   * When the invalid flag was set.
+   */
+  invalidatedAt?: string | null;
+
+  /**
    * When the contact was created
    */
   createdAt: string;
@@ -2026,6 +2057,14 @@ export interface Contact {
    * Lists the contact belongs to (when fetching a single contact)
    */
   lists?: Array<{ id: string; name: string }>;
+}
+
+/**
+ * Response from triggering a bulk carrier lookup via `contacts.checkNumbers()`.
+ */
+export interface CheckNumbersResponse {
+  success: boolean;
+  message?: string;
 }
 
 /**

@@ -16,6 +16,7 @@ import type {
   ContactListsResponse,
   ImportContactsRequest,
   ImportContactsResponse,
+  CheckNumbersResponse,
 } from "../types";
 
 /**
@@ -203,16 +204,88 @@ export class ContactsResource {
     });
   }
 
+  /**
+   * Clear the invalid flag on a contact so future campaigns include it again.
+   *
+   * Contacts get auto-flagged as invalid when a send fails with a terminal
+   * bad-number error (landline, invalid number) or when a carrier lookup
+   * reports they can't receive SMS. Use this when you disagree with the
+   * auto-flag — e.g. the recipient ported from a landline to mobile.
+   *
+   * @param id - Contact ID
+   * @returns The contact with the flag cleared
+   *
+   * @example
+   * ```typescript
+   * const contact = await sendly.contacts.markValid('cnt_xxx');
+   * console.log(contact.invalidReason); // null
+   * ```
+   */
+  async markValid(id: string): Promise<Contact> {
+    const response = await this.http.request<RawContact>({
+      method: "POST",
+      path: `/contacts/${id}/mark-valid`,
+    });
+    return this.transformContact(response);
+  }
+
+  /**
+   * Trigger a background carrier lookup across your contacts. Landlines and
+   * other non-SMS-capable numbers are auto-excluded from future campaigns.
+   *
+   * The lookup runs asynchronously and takes 1–5 minutes depending on list
+   * size. Results populate the `lineType`, `carrierName`, and `invalidReason`
+   * fields on affected contacts — fetch the contact again after a few minutes
+   * to see updated state.
+   *
+   * Idempotent: re-triggering while a lookup is already running for the same
+   * scope is a no-op.
+   *
+   * @param options - Optional: scope to a single list, or force re-check
+   * @returns Acknowledgement
+   *
+   * @example
+   * ```typescript
+   * // Check all un-checked contacts
+   * await sendly.contacts.checkNumbers();
+   *
+   * // Check a specific list only
+   * await sendly.contacts.checkNumbers({ listId: 'lst_xxx' });
+   *
+   * // Re-check contacts even if previously looked up
+   * await sendly.contacts.checkNumbers({ force: true });
+   * ```
+   */
+  async checkNumbers(
+    options: { listId?: string; force?: boolean } = {},
+  ): Promise<CheckNumbersResponse> {
+    return this.http.request<CheckNumbersResponse>({
+      method: "POST",
+      path: "/contacts/lookup",
+      body: {
+        listId: options.listId ?? null,
+        force: options.force ?? false,
+      },
+    });
+  }
+
   private transformContact(raw: RawContact): Contact {
+    // Defensive: accept either snake_case or camelCase from the server.
+    const r = raw as any;
     return {
       id: raw.id,
-      phoneNumber: raw.phone_number,
+      phoneNumber: raw.phone_number ?? r.phoneNumber,
       name: raw.name,
       email: raw.email,
       metadata: raw.metadata,
-      optedOut: raw.opted_out,
-      createdAt: raw.created_at,
-      updatedAt: raw.updated_at,
+      optedOut: raw.opted_out ?? r.optedOut,
+      lineType: raw.line_type ?? r.lineType ?? null,
+      carrierName: raw.carrier_name ?? r.carrierName ?? null,
+      lineTypeCheckedAt: raw.line_type_checked_at ?? r.lineTypeCheckedAt ?? null,
+      invalidReason: raw.invalid_reason ?? r.invalidReason ?? null,
+      invalidatedAt: raw.invalidated_at ?? r.invalidatedAt ?? null,
+      createdAt: raw.created_at ?? r.createdAt,
+      updatedAt: raw.updated_at ?? r.updatedAt,
       lists: raw.lists?.map((l) => ({ id: l.id, name: l.name })),
     };
   }
@@ -440,6 +513,11 @@ interface RawContact {
   email?: string | null;
   metadata?: Record<string, any>;
   opted_out?: boolean;
+  line_type?: string | null;
+  carrier_name?: string | null;
+  line_type_checked_at?: string | null;
+  invalid_reason?: string | null;
+  invalidated_at?: string | null;
   created_at: string;
   updated_at?: string;
   lists?: Array<{ id: string; name: string }>;
