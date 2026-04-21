@@ -1,5 +1,23 @@
 # @sendly/node
 
+## 3.29.0
+
+### Minor Changes
+
+- `contacts.bulkMarkValid({ ids? | listId? })`: clear the invalid flag on many contacts at once (up to 10,000 per call). Escape hatch for when auto-mark misclassifies at scale.
+- `WebhookEventType` gains four list-health literals: `contact.auto_flagged`, `contact.marked_valid`, `contacts.lookup_completed`, `contacts.bulk_marked_valid`. Subscribe to these to drive your server off webhook events instead of polling `/contacts`.
+- New `ListHealthEventSource` exported type — frozen enum for the `source` field on auto-flag and mark-valid events (`send_failure | carrier_lookup | user_action | bulk_mark_valid`).
+- `Contact` type gains `userMarkedValidAt` — when the user manually cleared an auto-flag. Carrier re-checks respect this timestamp and leave the contact clean.
+- `CheckNumbersResponse` gains `alreadyRunning?: boolean` so the client knows when a rapid re-trigger was collapsed against an in-flight lookup.
+
+## 3.28.0
+
+### Minor Changes
+
+- `contacts.markValid(id)`: clear the auto-exclusion flag on a contact.
+- `contacts.checkNumbers({ listId?, force? })`: trigger a background carrier lookup that flags landlines and non-SMS-capable numbers before you send.
+- `Contact` type gains `lineType`, `carrierName`, `lineTypeCheckedAt`, `invalidReason`, `invalidatedAt`. Field transform now accepts either snake_case or camelCase from the server defensively.
+
 ## 3.27.2
 
 ### Patch Changes

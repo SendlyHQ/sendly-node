@@ -59,6 +59,7 @@ export type { MediaFile, MediaUploadOptions } from "./types";
 // Types - Webhooks
 export type {
   WebhookEventType,
+  ListHealthEventSource,
   CircuitState,
   DeliveryStatus,
   Webhook,
@@ -129,6 +130,9 @@ export type {
   ImportContactsRequest,
   ImportContactsError,
   ImportContactsResponse,
+  CheckNumbersResponse,
+  BulkMarkValidOptions,
+  BulkMarkValidResponse,
 } from "./types";
 
 // Types - Enterprise

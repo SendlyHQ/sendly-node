@@ -1200,7 +1200,21 @@ export type WebhookEventType =
   | "verification.expired"
   | "verification.failed"
   | "verification.resent"
-  | "verification.delivery_failed";
+  | "verification.delivery_failed"
+  | "contact.auto_flagged"
+  | "contact.marked_valid"
+  | "contacts.lookup_completed"
+  | "contacts.bulk_marked_valid";
+
+/**
+ * Source of a list-health event. Frozen enum — new values will be
+ * added in minor SDK versions, never removed.
+ */
+export type ListHealthEventSource =
+  | "send_failure"
+  | "carrier_lookup"
+  | "user_action"
+  | "bulk_mark_valid";
 
 /**
  * Webhook mode - filters which events are delivered
@@ -2044,6 +2058,14 @@ export interface Contact {
   invalidatedAt?: string | null;
 
   /**
+   * When a user manually cleared an auto-flag on this contact. Carrier
+   * re-checks that would re-flag the contact as invalid respect this
+   * timestamp and leave the contact clean, so your manual decisions
+   * survive future lookups.
+   */
+  userMarkedValidAt?: string | null;
+
+  /**
    * When the contact was created
    */
   createdAt: string;
@@ -2064,7 +2086,34 @@ export interface Contact {
  */
 export interface CheckNumbersResponse {
   success: boolean;
+  /**
+   * True if a carrier lookup for this scope was already running when you
+   * called this. The dashboard renders an "already in progress" toast when
+   * it sees this flag; server-side integrators can treat it as a soft
+   * no-op and wait for `contacts.lookup_completed` webhook.
+   */
+  alreadyRunning?: boolean;
   message?: string;
+}
+
+/**
+ * Scope for `contacts.bulkMarkValid()`. Pass either an explicit id array
+ * (up to 10,000 per call) OR a `listId` — not both. Foreign ids silently
+ * no-op via the per-org filter.
+ */
+export interface BulkMarkValidOptions {
+  /** Explicit contact ids to clear (max 10,000). */
+  ids?: string[];
+  /** Clear every flagged member of this list. */
+  listId?: string;
+}
+
+/**
+ * Response from `contacts.bulkMarkValid()`.
+ */
+export interface BulkMarkValidResponse {
+  /** Number of contacts whose invalid flag was actually cleared. */
+  cleared: number;
 }
 
 /**

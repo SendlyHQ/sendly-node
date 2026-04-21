@@ -17,6 +17,8 @@ import type {
   ImportContactsRequest,
   ImportContactsResponse,
   CheckNumbersResponse,
+  BulkMarkValidOptions,
+  BulkMarkValidResponse,
 } from "../types";
 
 /**
@@ -230,6 +232,45 @@ export class ContactsResource {
   }
 
   /**
+   * Clear the invalid flag on many contacts at once — the escape hatch
+   * for when auto-flag misclassifies at scale. Pass either an explicit
+   * id array (up to 10,000 per call) OR a `listId`, not both. Foreign
+   * ids silently no-op via the per-organization filter.
+   *
+   * @param options - `{ ids }` or `{ listId }`
+   * @returns `{ cleared }` — number of contacts whose flag was actually
+   *          cleared. Already-clean contacts and foreign ids don't count.
+   *
+   * @example
+   * ```typescript
+   * // Clear a specific set of ids
+   * const { cleared } = await sendly.contacts.bulkMarkValid({
+   *   ids: ['cnt_abc', 'cnt_def', 'cnt_ghi'],
+   * });
+   *
+   * // Clear every flagged member of a list
+   * await sendly.contacts.bulkMarkValid({ listId: 'lst_xxx' });
+   * ```
+   */
+  async bulkMarkValid(
+    options: BulkMarkValidOptions,
+  ): Promise<BulkMarkValidResponse> {
+    if (!options.ids && !options.listId) {
+      throw new Error("bulkMarkValid requires either 'ids' or 'listId'");
+    }
+    if (options.ids && options.listId) {
+      throw new Error("bulkMarkValid accepts 'ids' OR 'listId', not both");
+    }
+    return this.http.request<BulkMarkValidResponse>({
+      method: "POST",
+      path: "/contacts/bulk-mark-valid",
+      body: options.ids
+        ? { ids: options.ids }
+        : { listId: options.listId },
+    });
+  }
+
+  /**
    * Trigger a background carrier lookup across your contacts. Landlines and
    * other non-SMS-capable numbers are auto-excluded from future campaigns.
    *
@@ -284,6 +325,8 @@ export class ContactsResource {
       lineTypeCheckedAt: raw.line_type_checked_at ?? r.lineTypeCheckedAt ?? null,
       invalidReason: raw.invalid_reason ?? r.invalidReason ?? null,
       invalidatedAt: raw.invalidated_at ?? r.invalidatedAt ?? null,
+      userMarkedValidAt:
+        raw.user_marked_valid_at ?? r.userMarkedValidAt ?? null,
       createdAt: raw.created_at ?? r.createdAt,
       updatedAt: raw.updated_at ?? r.updatedAt,
       lists: raw.lists?.map((l) => ({ id: l.id, name: l.name })),
@@ -518,6 +561,7 @@ interface RawContact {
   line_type_checked_at?: string | null;
   invalid_reason?: string | null;
   invalidated_at?: string | null;
+  user_marked_valid_at?: string | null;
   created_at: string;
   updated_at?: string;
   lists?: Array<{ id: string; name: string }>;
