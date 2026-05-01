@@ -14,6 +14,10 @@ import type {
   WebhookTestResult,
   WebhookSecretRotation,
   WebhookEventType,
+  WebhookRedeliverOptions,
+  WebhookRedeliverResult,
+  WebhookBackfillOptions,
+  WebhookBackfillResult,
 } from "../types";
 
 /**
@@ -276,6 +280,107 @@ export class WebhooksResource {
     });
 
     return transformKeys<{ message: string; webhook: Webhook }>(response);
+  }
+
+  /**
+   * Replay failed or cancelled webhook deliveries from the audit log.
+   *
+   * Use after a customer endpoint has recovered from an outage to re-fire
+   * deliveries that we recorded but couldn't deliver. Each replay creates
+   * a new delivery row preserving the original `event_id` so customers can
+   * dedupe.
+   *
+   * Rejects with HTTP 409 if the circuit is currently open — call
+   * {@link WebhooksResource.resetCircuit} first.
+   *
+   * @param id - Webhook ID
+   * @param options - Window and filter options
+   * @returns Counts of requeued deliveries plus the new delivery IDs
+   *
+   * @example
+   * ```typescript
+   * await sendly.webhooks.resetCircuit('whk_xxx');
+   * const result = await sendly.webhooks.redeliver('whk_xxx', {
+   *   since: '2026-05-01T00:00:00Z',
+   *   eventTypes: ['message.delivered', 'message.failed'],
+   *   limit: 5000,
+   * });
+   * console.log(`Requeued ${result.requeued} deliveries`);
+   * ```
+   */
+  async redeliver(
+    id: string,
+    options: WebhookRedeliverOptions = {},
+  ): Promise<WebhookRedeliverResult> {
+    if (!id || !id.startsWith("whk_")) {
+      throw new Error("Invalid webhook ID format");
+    }
+
+    const body: Record<string, unknown> = {};
+    if (options.since !== undefined) body.since = options.since;
+    if (options.until !== undefined) body.until = options.until;
+    if (options.eventTypes !== undefined) body.event_types = options.eventTypes;
+    if (options.statuses !== undefined) body.statuses = options.statuses;
+    if (options.limit !== undefined) body.limit = options.limit;
+
+    const response = await this.http.request<unknown>({
+      method: "POST",
+      path: `/webhooks/${encodeURIComponent(id)}/redeliver`,
+      body,
+    });
+
+    return transformKeys<WebhookRedeliverResult>(response);
+  }
+
+  /**
+   * Backfill missed webhook events from the underlying message log.
+   *
+   * Use this when a circuit-breaker outage left events with no audit row
+   * (the case `redeliver` cannot recover). The endpoint scans the
+   * `messages` table for the window and synthesizes a webhook delivery
+   * for any message whose `message.sent` / `message.delivered` /
+   * `message.failed` event has not been successfully delivered yet.
+   *
+   * Synthesized events have fresh IDs — your endpoint should dedupe by
+   * `event.data.object.id` (the message ID).
+   *
+   * Rejects with HTTP 409 if the circuit is currently open — call
+   * {@link WebhooksResource.resetCircuit} first.
+   *
+   * @param id - Webhook ID
+   * @param options - Window and filter options
+   * @returns Counts grouped by event type plus the new delivery IDs
+   *
+   * @example
+   * ```typescript
+   * const result = await sendly.webhooks.backfill('whk_xxx', {
+   *   since: '2026-05-01T00:00:00Z',
+   *   eventTypes: ['message.delivered', 'message.failed'],
+   * });
+   * console.log(`Synthesized ${result.synthesized} events`, result.byType);
+   * ```
+   */
+  async backfill(
+    id: string,
+    options: WebhookBackfillOptions = {},
+  ): Promise<WebhookBackfillResult> {
+    if (!id || !id.startsWith("whk_")) {
+      throw new Error("Invalid webhook ID format");
+    }
+
+    const body: Record<string, unknown> = {};
+    if (options.since !== undefined) body.since = options.since;
+    if (options.until !== undefined) body.until = options.until;
+    if (options.eventTypes !== undefined) body.event_types = options.eventTypes;
+    if (options.limit !== undefined) body.limit = options.limit;
+
+    const response = await this.http.request<unknown>({
+      method: "POST",
+      path: `/webhooks/${encodeURIComponent(id)}/backfill`,
+      body,
+    });
+
+    return transformKeys<WebhookBackfillResult>(response);
   }
 
   /**

@@ -1370,6 +1370,76 @@ export interface UpdateWebhookOptions {
 }
 
 /**
+ * Options for replaying webhook deliveries
+ */
+export interface WebhookRedeliverOptions {
+  /** Earliest delivery created_at to consider, ISO-8601 (default: now − 24h) */
+  since?: string;
+  /** Latest delivery created_at to consider, ISO-8601 (default: now) */
+  until?: string;
+  /** Filter by event type (default: all) */
+  eventTypes?: WebhookEventType[];
+  /** Replay deliveries in any of these statuses (default: ['failed', 'cancelled']) */
+  statuses?: DeliveryStatus[];
+  /** Maximum number of deliveries to requeue (default: 1000, max 10000) */
+  limit?: number;
+}
+
+/**
+ * Result of replaying webhook deliveries
+ */
+export interface WebhookRedeliverResult {
+  message: string;
+  /** Number of deliveries that were re-queued */
+  requeued: number;
+  /** Number of deliveries that failed to re-queue */
+  skipped: number;
+  /** True if the matching set was larger than `limit` */
+  truncated: boolean;
+  /** Total number of matching deliveries before the limit was applied */
+  windowSize: number;
+  /** IDs of the new delivery records created by the replay */
+  deliveryIds: string[];
+  since: string;
+  until: string;
+  limit: number;
+}
+
+/**
+ * Options for backfilling missed webhook deliveries from the message log
+ */
+export interface WebhookBackfillOptions {
+  /** Earliest message created_at to consider, ISO-8601 (default: now − 24h) */
+  since?: string;
+  /** Latest message created_at to consider, ISO-8601 (default: now) */
+  until?: string;
+  /** Filter by event type (default: subscribed message events) */
+  eventTypes?: WebhookEventType[];
+  /** Maximum number of events to synthesize (default: 1000, max 10000) */
+  limit?: number;
+}
+
+/**
+ * Result of backfilling missed webhook deliveries
+ */
+export interface WebhookBackfillResult {
+  message: string;
+  /** Number of deliveries synthesized and dispatched */
+  synthesized: number;
+  /** Synthesized count grouped by event type */
+  byType: Record<string, number>;
+  /** True if there were more eligible events than `limit` */
+  truncated: boolean;
+  /** Total number of messages scanned for the window */
+  candidatesScanned: number;
+  /** IDs of the new delivery records */
+  deliveryIds: string[];
+  since: string;
+  until: string;
+  limit: number;
+}
+
+/**
  * A webhook delivery attempt
  */
 export interface WebhookDelivery {
