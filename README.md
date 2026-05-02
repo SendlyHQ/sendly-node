@@ -265,6 +265,35 @@ await sendly.webhooks.retryDelivery('whk_xxx', 'del_yyy');
 await sendly.webhooks.delete('whk_xxx');
 ```
 
+### Recovering Missed Events
+
+After an outage (your endpoint was down, or our circuit breaker opened),
+two methods recover what was missed:
+
+```typescript
+// Redeliver: re-send specific failed deliveries already in the audit log.
+const redeliver = await sendly.webhooks.redeliver('whk_xxx', {
+  since: '2026-05-01T00:00:00Z',
+  until: '2026-05-01T18:00:00Z',
+  eventTypes: ['message.delivered', 'message.failed'],
+  limit: 5000,
+});
+console.log(`Queued ${redeliver.queued} retries`);
+
+// Backfill: synthesize deliveries for messages whose events never created
+// a delivery row in the first place (silent-drop case).
+const backfill = await sendly.webhooks.backfill('whk_xxx', {
+  since: '2026-05-01T00:00:00Z',
+  eventTypes: ['message.delivered', 'message.failed'],
+});
+console.log(`Backfilled ${backfill.queued} events`);
+```
+
+Use `redeliver` when deliveries exist but failed (e.g. your server returned
+5xx). Use `backfill` when deliveries are missing entirely (e.g. circuit
+was open during the outage). Both are idempotent — duplicate calls within
+the same window won't double-send.
+
 ### Verifying Webhook Signatures
 
 ```typescript
@@ -578,6 +607,14 @@ Get delivery history for a webhook.
 #### `retryDelivery(webhookId: string, deliveryId: string): Promise<void>`
 
 Retry a failed delivery.
+
+#### `redeliver(id: string, options?: WebhookRedeliverOptions): Promise<WebhookRedeliverResult>`
+
+Re-queue failed deliveries from a time window. Idempotent.
+
+#### `backfill(id: string, options?: WebhookBackfillOptions): Promise<WebhookBackfillResult>`
+
+Synthesize deliveries for messages whose events never reached the audit log (silent-drop recovery). Idempotent.
 
 ### `sendly.account`
 
