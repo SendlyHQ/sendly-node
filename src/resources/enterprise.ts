@@ -1,5 +1,48 @@
 import type { HttpClient } from "../utils/http";
 import { transformKeys } from "../utils/transform";
+
+/**
+ * Verification submit/resubmit payload. All fields optional for resubmits
+ * (server merges with existing record). For initial provision via
+ * `submitVerification` (no existing record), the validator requires:
+ * businessName, website, address, contact, useCase, useCaseSummary,
+ * sampleMessages, optInWorkflow.
+ */
+export interface VerificationSubmitInput {
+  businessName?: string;
+  doingBusinessAs?: string;
+  website?: string;
+  address?: {
+    street?: string;
+    address1?: string;
+    address2?: string | null;
+    city?: string;
+    state?: string;
+    zip?: string;
+    country?: string;
+  };
+  contact?: {
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    phone?: string;
+  };
+  brn?: string | null;
+  brnType?: "EIN" | "SSN" | "DUNS" | "CRA" | "VAT" | "LEI" | "OTHER" | null;
+  brnCountry?: string | null;
+  entityType?: "SOLE_PROPRIETOR" | "PRIVATE_PROFIT" | "PUBLIC_PROFIT" | "NON_PROFIT" | "GOVERNMENT";
+  useCase?: string;
+  useCaseSummary?: string;
+  sampleMessages?: string;
+  optInWorkflow?: string;
+  optInImageUrls?: string;
+  monthlyVolume?: string;
+  additionalInformation?: string;
+  ageGatedContent?: boolean;
+  isvReseller?: string;
+  privacyUrl?: string;
+  termsUrl?: string;
+}
 import type {
   EnterpriseAccount,
   EnterpriseWorkspace,
@@ -99,39 +142,68 @@ class WorkspacesSubResource {
     });
   }
 
+  /**
+   * Submit (or resubmit) a verification for an enterprise workspace.
+   *
+   * Partial-update friendly (May 2026): for resubmit on an existing
+   * workspace, you only need to send the fields you want to change —
+   * everything else is preserved from the existing record. Hosted page
+   * URLs (`/biz/`, `/opt-in/`, `/legal/`) generated during provision
+   * are auto-preserved.
+   *
+   * For sole proprietors, leave `brn`, `brnType`, `brnCountry` undefined
+   * — the server strips them before forwarding to the carrier.
+   *
+   * @example Full submit
+   * ```ts
+   * await sendly.enterprise.workspaces.submitVerification(workspaceId, {
+   *   businessName: "Acme LLC",
+   *   website: "https://acme.com",
+   *   address: { street: "...", city: "...", state: "California", zip: "90001", country: "US" },
+   *   contact: { firstName: "...", lastName: "...", email: "...", phone: "+15551234567" },
+   *   useCase: "Insurance Services",
+   *   useCaseSummary: "...",
+   *   sampleMessages: "...",
+   *   optInWorkflow: "...",
+   *   entityType: "SOLE_PROPRIETOR",
+   * });
+   * ```
+   *
+   * @example Partial-update resubmit (only changing email)
+   * ```ts
+   * await sendly.enterprise.workspaces.submitVerification(workspaceId, {
+   *   contact: { email: "new@email.com" },
+   * });
+   * ```
+   */
   async submitVerification(
     workspaceId: string,
-    data: {
-      businessName: string;
-      businessType: string;
-      ein: string;
-      address: string;
-      city: string;
-      state: string;
-      zip: string;
-      useCase: string;
-      sampleMessages: string[];
-      monthlyVolume?: number;
-    },
+    data: VerificationSubmitInput,
   ): Promise<unknown> {
+    // Strip undefined values so server-side merge picks up existing values
+    const body: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(data)) {
+      if (v !== undefined) body[k] = v;
+    }
+
     const response = await this.http.request<unknown>({
       method: "POST",
       path: `/enterprise/workspaces/${encodeURIComponent(workspaceId)}/verification/submit`,
-      body: {
-        business_name: data.businessName,
-        business_type: data.businessType,
-        ein: data.ein,
-        address: data.address,
-        city: data.city,
-        state: data.state,
-        zip: data.zip,
-        use_case: data.useCase,
-        sample_messages: data.sampleMessages,
-        ...(data.monthlyVolume && { monthly_volume: data.monthlyVolume }),
-      },
+      body,
     });
 
     return transformKeys(response);
+  }
+
+  /**
+   * Convenience alias for resubmits. Reads more naturally when you only
+   * want to update a few fields after a rejection.
+   */
+  async resubmitVerification(
+    workspaceId: string,
+    partialUpdates: VerificationSubmitInput,
+  ): Promise<unknown> {
+    return this.submitVerification(workspaceId, partialUpdates);
   }
 
   async inheritVerification(
