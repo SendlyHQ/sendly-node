@@ -1,5 +1,11 @@
 # @sendly/node
 
+## 3.31.0
+
+### Patch Changes
+
+- Version bump for unified release. No Node SDK code changes — this release exists for parity with sibling SDKs that shipped fixes in this cycle (PHP doc/code mismatch, Ruby positional constructor, Rust + Java added `suggest_replies` / `suggestReplies`).
+
 ## 3.30.0
 
 ### Minor Changes
