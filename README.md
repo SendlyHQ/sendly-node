@@ -185,8 +185,8 @@ const preview = await sendly.messages.previewBatch({
     { to: '+447700900123', text: 'Hello UK!' }
   ]
 });
-console.log(`Total credits needed: ${preview.totalCredits}`);
-console.log(`Valid: ${preview.valid}, Invalid: ${preview.invalid}`);
+console.log(`Credits needed: ${preview.creditsNeeded}`);
+console.log(`Will send: ${preview.willSend}, Blocked: ${preview.blocked}`);
 ```
 
 ### Rate Limit Information
@@ -233,7 +233,7 @@ const webhook = await sendly.webhooks.create({
 });
 
 console.log(`Webhook ID: ${webhook.id}`);
-console.log(`Secret: ${webhook.secret}`); // Store this securely!
+console.log(`Secret: ${webhook.secret}`); // Only returned at creation - store securely!
 
 // List all webhooks
 const webhooks = await sendly.webhooks.list();
@@ -275,10 +275,11 @@ const webhooks = new Webhooks('your_webhook_secret');
 // In your webhook handler
 app.post('/webhooks/sendly', (req, res) => {
   const signature = req.headers['x-sendly-signature'];
+  const timestamp = req.headers['x-sendly-timestamp'];
   const payload = req.body;
 
   try {
-    const event = webhooks.verifyAndParse(payload, signature);
+    const event = webhooks.parse(payload, signature, timestamp);
     
     switch (event.type) {
       case 'message.delivered':
@@ -311,13 +312,13 @@ console.log(`Reserved (scheduled): ${credits.reservedBalance} credits`);
 console.log(`Total: ${credits.balance} credits`);
 
 // View credit transaction history
-const { data: transactions } = await sendly.account.getCreditTransactions();
+const transactions = await sendly.account.getCreditTransactions();
 for (const tx of transactions) {
   console.log(`${tx.type}: ${tx.amount} credits - ${tx.description}`);
 }
 
 // List API keys
-const { data: keys } = await sendly.account.listApiKeys();
+const keys = await sendly.account.listApiKeys();
 for (const key of keys) {
   console.log(`${key.name}: ${key.prefix}*** (${key.type})`);
 }
@@ -328,12 +329,9 @@ console.log(`Messages sent: ${usage.messagesSent}`);
 console.log(`Credits used: ${usage.creditsUsed}`);
 
 // Create a new API key
-const newKey = await sendly.account.createApiKey({
-  name: 'Production Key',
-  type: 'live',
-  scopes: ['sms:send', 'sms:read']
-});
-console.log(`New key: ${newKey.key}`); // Only shown once!
+const { apiKey, key } = await sendly.account.createApiKey('Production Key');
+console.log(`New key: ${key}`); // Only shown once!
+console.log(`Key ID: ${apiKey.id}`);
 
 // Revoke an API key
 await sendly.account.revokeApiKey('key_xxx');
@@ -525,11 +523,11 @@ List scheduled messages.
 
 Get a scheduled message by ID.
 
-#### `cancelScheduled(id: string): Promise<CancelScheduledMessageResponse>`
+#### `cancelScheduled(id: string): Promise<CancelledMessageResponse>`
 
 Cancel a scheduled message and refund credits.
 
-#### `sendBatch(request: SendBatchRequest): Promise<BatchMessageResponse>`
+#### `sendBatch(request: BatchMessageRequest): Promise<BatchMessageResponse>`
 
 Send multiple messages in one API call.
 
@@ -543,9 +541,9 @@ List all batches.
 
 ### `sendly.webhooks`
 
-#### `create(request: CreateWebhookRequest): Promise<Webhook>`
+#### `create(options: CreateWebhookOptions): Promise<WebhookCreatedResponse>`
 
-Create a new webhook endpoint.
+Create a new webhook endpoint. The returned object includes a one-time `secret`.
 
 #### `list(): Promise<Webhook[]>`
 
@@ -555,7 +553,7 @@ List all webhooks.
 
 Get a webhook by ID.
 
-#### `update(id: string, request: UpdateWebhookRequest): Promise<Webhook>`
+#### `update(id: string, options: UpdateWebhookOptions): Promise<Webhook>`
 
 Update a webhook.
 
@@ -589,11 +587,11 @@ Get account information.
 
 Get credit balance.
 
-#### `getCreditTransactions(): Promise<CreditTransactionListResponse>`
+#### `getCreditTransactions(options?: { limit?: number; offset?: number }): Promise<CreditTransaction[]>`
 
 Get credit transaction history.
 
-#### `listApiKeys(): Promise<ApiKeyListResponse>`
+#### `listApiKeys(): Promise<ApiKey[]>`
 
 List API keys.
 
@@ -662,25 +660,27 @@ await client.enterprise.workspaces.delete('ws_xxx');
 // Submit full verification
 await client.enterprise.workspaces.submitVerification('ws_xxx', {
   businessName: 'Acme Insurance LLC',
-  businessType: 'llc',
-  ein: '12-3456789',
-  address: '100 Main St',
-  city: 'Austin',
-  state: 'TX',
-  zip: '78701',
+  website: 'https://acme.com',
+  entityType: 'PRIVATE_PROFIT',
+  brn: '12-3456789',
+  brnType: 'EIN',
+  brnCountry: 'US',
+  address: { street: '100 Main St', city: 'Austin', state: 'TX', zip: '78701', country: 'US' },
+  contact: { firstName: 'Jane', lastName: 'Doe', email: 'jane@acme.com', phone: '+15551234567' },
   useCase: 'Policy renewal reminders',
-  sampleMessages: ['Your policy renews on 3/15.']
+  sampleMessages: 'Your policy renews on 3/15.'
 });
 
-// Inherit from verified workspace
+// Inherit from verified workspace (shares toll-free number)
 await client.enterprise.workspaces.inheritVerification('ws_new', {
   sourceWorkspaceId: 'ws_verified'
 });
 
-// Inherit with new number
-await client.enterprise.workspaces.inheritVerification('ws_new', {
+// Inherit + new number: use provision() with inheritWithNewNumber instead
+await client.enterprise.provision({
+  name: 'Acme Insurance - Austin',
   sourceWorkspaceId: 'ws_verified',
-  purchaseNewNumber: true
+  inheritWithNewNumber: true
 });
 ```
 
