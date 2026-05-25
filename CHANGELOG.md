@@ -1,5 +1,56 @@
 # @sendly/node
 
+## 3.33.0
+
+### Minor Changes
+
+- [`8d4fbf0`](https://github.com/SendlyHQ/sendly/commit/8d4fbf03dae2467b00f0e21a316ccb313c5ba53a) Thanks [@sendly-live](https://github.com/sendly-live)! - # Entity-upgrade SDK + CLI + MCP coverage (Part 2)
+
+  Adds the customer-facing entity-upgrade ("fork-with-new-number") flow to
+  the programmatic surfaces alongside the existing UI in
+  `/settings/business/upgrade`.
+
+  ## What's new across surfaces
+
+  **Node SDK (`@sendly/node` → 3.32.0):**
+  New `sendly.businessUpgrade` resource with 7 methods that mirror the
+  customer-facing API endpoints (`preflight`, `bestPrefill`, `start`,
+  `status`, `cancel`, `resubmit`, `setDisposition`). Multipart EIN doc
+  upload via the existing `requestFormData` helper.
+
+  **MCP server (`@sendly/mcp` → 2.4.0):**
+  7 new tools (`preflight_business_upgrade`,
+  `get_business_upgrade_best_prefill`, `start_business_upgrade`,
+  `get_business_upgrade_status`, `cancel_business_upgrade`,
+  `resubmit_business_upgrade`,
+  `set_business_upgrade_old_number_disposition`). EIN docs round-trip
+  via base64. Tool descriptions written for AI agent reasoning. Total
+  tool count 91 → 98.
+
+  **CLI (`@sendly/cli` → 3.36.0):**
+  New `sendly business-upgrade` topic with 6 subcommands (`preflight`,
+  `start`, `status`, `cancel`, `resubmit`, `disposition`). Multipart
+  upload via `--ein-doc <path>`. Hyphenated topic name avoids collision
+  with the existing `sendly upgrade` self-updater.
+
+  **Backend (server/routes.ts):**
+  Customer endpoints (`/api/v1/workspaces/:id/upgrade*`,
+  `/api/v1/verification/preflight`, `/api/v1/verification/best-prefill`)
+  now use `cliAuthMiddleware` — accept ANY of session cookies, live
+  API keys, or CLI tokens. Same ownership check inside each handler.
+
+  ## Out of scope (next session — pattern is the same as Node):
+  - Python SDK
+  - Ruby SDK
+  - Go SDK
+  - Rust SDK
+  - Java SDK
+  - C# SDK
+  - PHP SDK
+  - Agent skill (`packages/agent-skills/skills/upgrading-business-entity`)
+  - Divio four-quadrant docs
+  - README updates per SDK
+
 ## 3.31.0
 
 ### Patch Changes
