@@ -18,6 +18,7 @@ import { ConversationsResource } from "./resources/conversations";
 import { LabelsResource } from "./resources/labels";
 import { DraftsResource } from "./resources/drafts";
 import { RulesResource } from "./resources/rules";
+import { BusinessUpgradeResource } from "./resources/businessUpgrade";
 
 const DEFAULT_BASE_URL = "https://sendly.live/api/v1";
 const DEFAULT_TIMEOUT = 30000;
@@ -237,6 +238,32 @@ export class Sendly {
    */
   public readonly enterprise: EnterpriseResource;
 
+  /**
+   * Business Upgrade resource — toll-free entity-upgrade flow.
+   *
+   * @example
+   * ```typescript
+   * // Preview a candidate upgrade before submitting
+   * const preview = await sendly.businessUpgrade.preflight({
+   *   businessName: "Acme Holdings LLC",
+   *   brn: "12-3456789",
+   *   brnType: "EIN",
+   *   brnCountry: "US",
+   *   entityType: "PRIVATE_PROFIT",
+   * });
+   *
+   * // Start an upgrade — auto-reserves a new toll-free number
+   * const { pendingVerificationId } = await sendly.businessUpgrade.start("ws_abc", {
+   *   businessName: "Acme Holdings LLC",
+   *   brn: "12-3456789",
+   *   brnType: "EIN",
+   *   brnCountry: "US",
+   *   entityType: "PRIVATE_PROFIT",
+   * }, { einDoc: { buffer: pdfBuffer } });
+   * ```
+   */
+  public readonly businessUpgrade: BusinessUpgradeResource;
+
   private readonly http: HttpClient;
   private readonly config: Required<Pick<SendlyConfig, "apiKey" | "baseUrl" | "timeout" | "maxRetries">> & Pick<SendlyConfig, "organizationId">;
 
@@ -286,6 +313,7 @@ export class Sendly {
     this.contacts = new ContactsResource(this.http);
     this.media = new MediaResource(this.http);
     this.enterprise = new EnterpriseResource(this.http);
+    this.businessUpgrade = new BusinessUpgradeResource(this.http);
   }
 
   /**
