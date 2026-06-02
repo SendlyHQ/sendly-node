@@ -210,6 +210,21 @@ export type {
   ListDraftsOptions,
 } from "./types";
 
+// Types - Numbers
+export type {
+  NumberCountry,
+  ListNumberCountriesResponse,
+  AvailableNumber,
+  ListAvailableNumbersOptions,
+  ListAvailableNumbersResponse,
+  OwnedNumber,
+  ListNumbersResponse,
+  BuyNumberRequest,
+  BuyNumberStatus,
+  NumberBuyAction,
+  BuyNumberResponse,
+} from "./resources/numbers";
+
 // Constants
 export {
   CREDITS_PER_SMS,

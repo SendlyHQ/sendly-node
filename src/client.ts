@@ -19,6 +19,7 @@ import { LabelsResource } from "./resources/labels";
 import { DraftsResource } from "./resources/drafts";
 import { RulesResource } from "./resources/rules";
 import { BusinessUpgradeResource } from "./resources/businessUpgrade";
+import { NumbersResource } from "./resources/numbers";
 
 const DEFAULT_BASE_URL = "https://sendly.live/api/v1";
 const DEFAULT_TIMEOUT = 30000;
@@ -264,6 +265,31 @@ export class Sendly {
    */
   public readonly businessUpgrade: BusinessUpgradeResource;
 
+  /**
+   * Numbers API resource — discover, buy, and list phone numbers.
+   *
+   * @example
+   * ```typescript
+   * // Browse available numbers (already priced for your account)
+   * const { numbers } = await sendly.numbers.listAvailable({
+   *   country: "GB",
+   *   type: "mobile",
+   * });
+   *
+   * // Buy one
+   * const result = await sendly.numbers.buy({
+   *   phoneNumber: numbers[0].phoneNumber,
+   *   countryCode: numbers[0].country,
+   *   phoneNumberType: numbers[0].numberType,
+   *   monthlyCost: numbers[0].monthlyCost,
+   * });
+   *
+   * // List the numbers you own
+   * const { numbers: owned } = await sendly.numbers.list();
+   * ```
+   */
+  public readonly numbers: NumbersResource;
+
   private readonly http: HttpClient;
   private readonly config: Required<Pick<SendlyConfig, "apiKey" | "baseUrl" | "timeout" | "maxRetries">> & Pick<SendlyConfig, "organizationId">;
 
@@ -314,6 +340,7 @@ export class Sendly {
     this.media = new MediaResource(this.http);
     this.enterprise = new EnterpriseResource(this.http);
     this.businessUpgrade = new BusinessUpgradeResource(this.http);
+    this.numbers = new NumbersResource(this.http);
   }
 
   /**
