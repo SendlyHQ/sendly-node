@@ -1,5 +1,18 @@
 # @sendly/node
 
+## 3.34.0
+
+### Minor Changes
+
+- [`e3896af`](https://github.com/SendlyHQ/sendly/commit/e3896affcc382482039cd98ee062274b7571c31d) Thanks [@sendly-live](https://github.com/sendly-live)! - Numbers API across the SDK family, plus contacts/conversations fixes.
+
+  **New — buy and manage phone numbers programmatically.** Adds a `numbers` resource (`list`, `listAvailable`, `listCountries`, `buy`) to every SDK (Node, Python, PHP, Ruby, Go, Java, .NET, Rust), `numbers list/search/buy` commands to the CLI, and `list_numbers`, `search_available_numbers`, `list_number_countries`, and `buy_number` tools to the MCP server. When a country needs registration documents or a payment method, `buy` returns a secure hosted-action hand-off: open the returned link, prove terminal access with the short code, complete the step on the Sendly dashboard, then re-call `buy` with the `actionCode` to provision.
+
+  **Fixes:**
+  - Python: contacts, campaigns, templates, and webhook writes now send the request body correctly (previously raised on every write).
+  - PHP: added `contacts.import()` and `conversations.suggestReplies()`.
+  - Ruby, Go, .NET: added the missing `conversations` suggested-replies method.
+
 ## 3.33.0
 
 ### Minor Changes
