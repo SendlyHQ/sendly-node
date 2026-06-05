@@ -88,7 +88,16 @@ export interface OwnedNumber {
   id: string;
   /** Phone number in E.164 format */
   phoneNumber: string;
-  /** Provisioning / lifecycle status */
+  /**
+   * Lifecycle status, one of:
+   * - `provisioning` — being set up with the carrier
+   * - `requirements_required` — awaiting regulatory documents (use
+   *   `requirementsSubmittedAt` to tell "needs documents" from "under review")
+   * - `active` — live; can send and receive
+   * - `failed` — provisioning failed
+   *
+   * A number can only send once it is `active`.
+   */
   status: string;
   /** How the number was acquired (e.g. "purchased", "ported") */
   source: string;
@@ -98,6 +107,16 @@ export interface OwnedNumber {
   phoneNumberType: string;
   /** Monthly cost in cents */
   monthlyCostCents: number;
+  /**
+   * When the customer submitted regulatory documents (ISO 8601), or `null`.
+   * For a `requirements_required` number: `null` = still needs documents,
+   * non-null = documents submitted and under carrier review.
+   */
+  requirementsSubmittedAt: string | null;
+  /** True if the number is scheduled to be released at the end of the paid period. */
+  pendingCancellation: boolean;
+  /** When a scheduled release takes effect (ISO 8601), or `null`. */
+  scheduledReleaseAt: string | null;
 }
 
 /**
