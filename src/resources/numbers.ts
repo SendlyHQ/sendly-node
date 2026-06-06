@@ -150,15 +150,22 @@ export interface BuyNumberRequest {
 /**
  * Outcome of a buy attempt.
  *
- * - `provisioning` — purchase accepted, the number is being set up.
- * - `documents_required` — the user must upload documents on a hosted page
- *   (see `action`) before the purchase can complete.
- * - `payment_required` — the user must complete payment on a hosted page
- *   (see `action`) before the purchase can complete.
+ * - `provisioning` — purchase accepted, the number is being set up; poll
+ *   {@link NumbersResource.list} until it is `active`.
+ * - `documents_required` — the country needs business details + documents. The
+ *   response carries an `action` (hosted-page `url` + `code`); have the user
+ *   complete it, then call `buy()` again with `actionCode`.
+ * - `under_review` — the submitted details are in; the number is reserved and
+ *   being verified + registered (usually a few business days). It cannot send
+ *   until it is `active` — poll {@link NumbersResource.list} for the status.
+ * - `payment_required` — a card is needed first. The response carries an
+ *   `action` (hosted-page `url` + `code`); have the user add a card, then call
+ *   `buy()` again with `actionCode`.
  */
 export type BuyNumberStatus =
   | "provisioning"
   | "documents_required"
+  | "under_review"
   | "payment_required";
 
 /**
