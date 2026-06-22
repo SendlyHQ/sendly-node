@@ -61,9 +61,13 @@ export interface SendMessageRequest {
   text: string;
 
   /**
-   * Sender ID or phone number (optional, uses default if not provided)
-   * For international: 2-11 alphanumeric characters
-   * For US/Canada: Your verified toll-free number
+   * Sender ID or phone number (optional, uses default if not provided).
+   * Accepts any of:
+   * - One of your owned/active numbers (E.164) — toll-free, ported, or a
+   *   purchased number — usable for any destination, including international.
+   * - A 2-11 character alphanumeric sender ID (international only).
+   * An unrecognised value is rejected for US/Canada and ignored (falls back to
+   * your sender ID) for international.
    */
   from?: string;
 
