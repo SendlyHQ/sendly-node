@@ -1,5 +1,15 @@
 # @sendly/node
 
+## 3.35.0
+
+### Minor Changes
+
+- [`4aa6a7b`](https://github.com/SendlyHQ/sendly/commit/4aa6a7b0cc779e89577d7624d75cca2c059bde72) Thanks [@sendly-live](https://github.com/sendly-live)! - Numbers: the programmatic buy flow now supports document-required countries end to end. `buy()` returns `documents_required` with a hosted-page action — relay the URL + code to the user to provide their business details and upload documents — and a re-buy with `actionCode` returns the new `under_review` status: the number is reserved and being verified + registered, and cannot send until it is `active`. The `buy_number` MCP tool description now spells out the agent hand-off and never reveals carrier/provider names.
+
+- [`855083a`](https://github.com/SendlyHQ/sendly/commit/855083a5e6771cf882520fed2c464afd1b25ba85) Thanks [@sendly-live](https://github.com/sendly-live)! - Numbers: the owned-number listing now surfaces lifecycle fields — `requirementsSubmittedAt`, `pendingCancellation`, and `scheduledReleaseAt` — alongside the existing `status` and `monthlyCostCents`. You can now tell an active number from one that still needs documents, is under carrier review, or is scheduled for release. The `list_numbers` MCP tool and `sendly numbers list` reflect the same fields.
+
+- [`c01cef9`](https://github.com/SendlyHQ/sendly/commit/c01cef9c2c620d21c7882b91f1c0f64a0908315a) Thanks [@sendly-live](https://github.com/sendly-live)! - Numbers: send from a number you own. Pass an owned, active number in E.164 as `from` on the single-message send and the message goes out from that number — now supported across every SDK and the `send` MCP tool. `from` can also be an alphanumeric sender ID for international destinations. It's optional and backward-compatible: omit it to use your default sender.
+
 ## 3.34.0
 
 ### Minor Changes
