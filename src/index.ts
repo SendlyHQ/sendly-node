@@ -225,6 +225,28 @@ export type {
   BuyNumberResponse,
 } from "./resources/numbers";
 
+// Types - 10DLC
+export type {
+  TenDlcBrandStatus,
+  TenDlcBrand,
+  TenDlcBrandListResponse,
+  TenDlcBrandResponse,
+  CreateTenDlcBrandRequest,
+  TenDlcThroughputTier,
+  TenDlcThroughput,
+  TenDlcQualifyResult,
+  TenDlcQualifyResponse,
+  TenDlcCampaignStatus,
+  TenDlcCampaign,
+  TenDlcCampaignListResponse,
+  TenDlcCampaignResponse,
+  CreateTenDlcCampaignRequest,
+  TenDlcAssignmentStatus,
+  TenDlcAssignment,
+  TenDlcAssignmentResponse,
+  TenDlcAssignmentListResponse,
+} from "./resources/tendlc";
+
 // Constants
 export {
   CREDITS_PER_SMS,

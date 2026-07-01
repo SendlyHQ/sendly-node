@@ -20,6 +20,7 @@ import { DraftsResource } from "./resources/drafts";
 import { RulesResource } from "./resources/rules";
 import { BusinessUpgradeResource } from "./resources/businessUpgrade";
 import { NumbersResource } from "./resources/numbers";
+import { TenDlcResource } from "./resources/tendlc";
 
 const DEFAULT_BASE_URL = "https://sendly.live/api/v1";
 const DEFAULT_TIMEOUT = 30000;
@@ -290,6 +291,34 @@ export class Sendly {
    */
   public readonly numbers: NumbersResource;
 
+  /**
+   * 10DLC API resource — register your business for carrier review and
+   * text from local US numbers.
+   *
+   * @example
+   * ```typescript
+   * // Register a brand, then poll until it's verified
+   * const { data: brand } = await sendly.tenDlc.createBrand({
+   *   legalName: "Acme Holdings LLC",
+   *   ein: "12-3456789",
+   *   website: "https://acme.example",
+   * });
+   *
+   * // Create a campaign under the verified brand
+   * const { data: campaign } = await sendly.tenDlc.createCampaign({
+   *   brandId: brand.id,
+   *   useCase: "MIXED",
+   *   description: "Order updates and support replies",
+   *   messageFlow: "Customers opt in at checkout",
+   *   sampleMessages: ["Your order #123 has shipped!"],
+   * });
+   *
+   * // Once the campaign is active, assign a number you own
+   * await sendly.tenDlc.assignNumber(campaign.id, "+15551234567");
+   * ```
+   */
+  public readonly tenDlc: TenDlcResource;
+
   private readonly http: HttpClient;
   private readonly config: Required<Pick<SendlyConfig, "apiKey" | "baseUrl" | "timeout" | "maxRetries">> & Pick<SendlyConfig, "organizationId">;
 
@@ -341,6 +370,7 @@ export class Sendly {
     this.enterprise = new EnterpriseResource(this.http);
     this.businessUpgrade = new BusinessUpgradeResource(this.http);
     this.numbers = new NumbersResource(this.http);
+    this.tenDlc = new TenDlcResource(this.http);
   }
 
   /**

@@ -337,6 +337,54 @@ console.log(`Key ID: ${apiKey.id}`);
 await sendly.account.revokeApiKey('key_xxx');
 ```
 
+## 10DLC (Local Number Texting)
+
+Register your business for carrier review so you can text from local (10-digit) US numbers. The flow is brand → campaign → assign number. Writes require a live API key.
+
+```typescript
+// 1. Register a brand for carrier review
+const { data: brand } = await sendly.tenDlc.createBrand({
+  legalName: 'Acme Holdings LLC',
+  ein: '12-3456789',
+  website: 'https://acme.example',
+  email: 'ops@acme.example',
+});
+
+// Poll until the brand is verified (or failed, with failureReasons)
+const { data: refreshed } = await sendly.tenDlc.getBrand(brand.id);
+console.log(refreshed.status); // "pending" -> "verified"
+
+// 2. Pre-check your use case, then create a campaign
+const { data: check } = await sendly.tenDlc.qualify(brand.id, 'MIXED');
+if (check.qualified) {
+  const { data: campaign } = await sendly.tenDlc.createCampaign({
+    brandId: brand.id,
+    useCase: 'MIXED',
+    description: 'Order updates and support replies for Acme customers',
+    messageFlow: 'Customers opt in at checkout on acme.example',
+    sampleMessages: ['Your order #123 has shipped!'],
+    optOutKeywords: 'STOP',
+  });
+
+  // Poll until carriers approve
+  const { data: approved } = await sendly.tenDlc.getCampaign(campaign.id);
+  console.log(approved.status); // "pending" -> "active"
+  console.log(approved.throughput?.tier); // e.g. "Standard"
+
+  // 3. Assign a number you own — it can send once the assignment is Active
+  const { data: assignment } = await sendly.tenDlc.assignNumber(
+    campaign.id,
+    '+15551234567',
+  );
+  console.log(assignment.status); // "Under review" -> "Active"
+}
+
+// List everything
+const { data: brands } = await sendly.tenDlc.listBrands();
+const { data: campaigns } = await sendly.tenDlc.listCampaigns();
+const { data: assignments } = await sendly.tenDlc.listAssignments();
+```
+
 ## Error Handling
 
 The SDK provides typed error classes for different error scenarios:
