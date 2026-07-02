@@ -1,5 +1,11 @@
 # @sendly/node
 
+## 3.36.0
+
+### Minor Changes
+
+- [`d78f40f`](https://github.com/SendlyHQ/sendly/commit/d78f40f01be3ed8d98e8f392bf6f7cc149c4fd03) Thanks [@sendly-live](https://github.com/sendly-live)! - 10DLC: register your business for carrier review and text from local (10-digit) US numbers, now programmatic. The new `tenDlc` resource covers the full flow — register a brand (`createBrand`), poll it to `verified` (`getBrand`), pre-check a use case (`qualify`), create a campaign (`createCampaign`), poll it to `active` (`getCampaign`), then attach a number you own (`assignNumber`); `listBrands` / `listCampaigns` / `listAssignments` round out the surface. Statuses, throughput tiers, and failure reasons come back in plain language. Writes require a live API key with the `tendlc:write` scope.
+
 ## 3.35.0
 
 ### Minor Changes
