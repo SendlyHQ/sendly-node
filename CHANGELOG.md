@@ -1,5 +1,11 @@
 # @sendly/node
 
+## 3.37.0
+
+### Minor Changes
+
+- [`4987b39`](https://github.com/SendlyHQ/sendly/commit/4987b39e176a5d62fa8b2a5780eac7f20ec8f6a1) Thanks [@sendly-live](https://github.com/sendly-live)! - Add group messaging support: `messages.sendGroup` sends a single message to 2-8 US/Canada recipients as one conversation thread, available across every SDK and the CLI. Also ships an animated `sendly upgrade` flow in the CLI and corrects the per-language documentation snippets.
+
 ## 3.36.0
 
 ### Minor Changes
