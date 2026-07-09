@@ -189,6 +189,36 @@ console.log(`Credits needed: ${preview.creditsNeeded}`);
 console.log(`Will send: ${preview.willSend}, Blocked: ${preview.blocked}`);
 ```
 
+### Group MMS
+
+```typescript
+// Send a group MMS to 2-8 recipients (US/Canada only). Every recipient sees
+// the others and replies fan out to the whole group. Requires an MMS-enabled,
+// 10DLC-registered number you own (omit `from` to use your default sender).
+const group = await sendly.messages.sendGroup({
+  to: ['+14155551234', '+14155555678'],
+  text: 'Hey team - quick sync at noon?'
+});
+
+console.log(group.id);                // msg_xxx
+console.log(group.status);            // 'sent' (or 'delivered' when simulated)
+console.log(group.group_message_id);  // grp_xxx (present on live sends)
+```
+
+### AI Enhance
+
+```typescript
+// Rewrite a draft into a single, polished SMS segment. Provide `text`,
+// `messageType`, or both.
+const result = await sendly.messages.enhance({
+  text: 'hey come check out our sale this weekend',
+  messageType: 'marketing'
+});
+
+console.log(result.enhanced);     // polished, <=160-char rewrite
+console.log(result.explanation);  // what changed and why
+```
+
 ### Rate Limit Information
 
 ```typescript
@@ -335,6 +365,74 @@ console.log(`Key ID: ${apiKey.id}`);
 
 // Revoke an API key
 await sendly.account.revokeApiKey('key_xxx');
+
+// Rotate an API key — issues a new key and keeps the old one working for a
+// grace period (gracePeriodHours: 24-168, default 24) so you can roll callers
+// over without downtime. The new secret is shown only once.
+const { newKey, oldKey, message } = await sendly.account.rotateApiKey('key_xxx', {
+  gracePeriodHours: 72
+});
+console.log(`New key: ${newKey.key}`); // Save this - shown once!
+console.log(message);                  // "Old key will expire in 72 hours"
+```
+
+## Phone Numbers
+
+Discover, buy, and manage the phone numbers you own.
+
+```typescript
+// Browse what's available and buy one
+const { countries } = await sendly.numbers.listCountries();
+const { numbers } = await sendly.numbers.listAvailable({ country: 'GB', type: 'mobile' });
+await sendly.numbers.buy({
+  phoneNumber: numbers[0].phoneNumber,
+  countryCode: numbers[0].country,
+  phoneNumberType: numbers[0].numberType,
+  monthlyCost: numbers[0].monthlyCost
+});
+
+// List the numbers you own
+const { numbers: owned } = await sendly.numbers.list();
+
+// Get one by id (includes isDefault)
+const number = await sendly.numbers.get('num_xxx');
+console.log(`${number.phoneNumber} — default: ${number.isDefault}`);
+
+// Make a number your workspace's default sender (must be active)
+await sendly.numbers.update('num_xxx', { isDefault: true });
+
+// Cancel a scheduled release ("keep this number")
+await sendly.numbers.update('num_xxx', { pendingCancellation: false });
+
+// Release a number. A live paid purchase is cancelled at period end.
+const result = await sendly.numbers.release('num_xxx');
+if (result.scheduled) {
+  console.log(`Releases at ${result.scheduledReleaseAt}`);
+} else {
+  console.log('Released');
+}
+```
+
+## Branded Links
+
+Mint branded short links for a destination URL, list them with click
+analytics, and disable an individual link. Requires the `url_shortener`
+rollout flag on your account.
+
+```typescript
+// Shorten a URL
+const link = await sendly.links.create({ url: 'https://example.com/welcome' });
+console.log(link.shortUrl); // https://sendly.live/l/Ab3xY7
+
+// List your links with click counts
+const { links, total } = await sendly.links.list({ limit: 20 });
+for (const l of links) {
+  console.log(`${l.shortUrl} -> ${l.destinationUrl} (${l.clickCount} clicks)`);
+}
+
+// Disable (kill) a link, or re-enable it
+await sendly.links.disable(link.code);
+await sendly.links.enable(link.code);
 ```
 
 ## 10DLC (Local Number Texting)

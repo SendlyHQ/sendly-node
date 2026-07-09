@@ -92,6 +92,78 @@ export interface SendMessageRequest {
 }
 
 /**
+ * Request to send a group MMS to multiple recipients (US/Canada only).
+ * Group messaging is an A2P 10DLC capability: the sending number must be an
+ * MMS-enabled, 10DLC-registered number you own.
+ */
+export interface SendGroupMessageRequest {
+  /**
+   * 2-8 recipient phone numbers in E.164 format. US and Canada only, and each
+   * must be an MMS-capable mobile.
+   */
+  to: string[];
+
+  /**
+   * Message body. Required unless `mediaUrls` is provided.
+   */
+  text?: string;
+
+  /**
+   * Sending number (E.164). Optional — omit to use your workspace's default
+   * sending number. When provided it must be an MMS-enabled, 10DLC-registered
+   * number you own, or the request is rejected with `invalid_from_number`.
+   */
+  from?: string;
+
+  /**
+   * HTTPS media URLs to attach. Required unless `text` is provided.
+   */
+  mediaUrls?: string[];
+
+  /**
+   * Message type for compliance. Group MMS defaults to "transactional"; pass
+   * "marketing" to apply quiet-hours rules.
+   */
+  messageType?: MessageType;
+}
+
+/**
+ * Response from sending a group MMS.
+ */
+export interface GroupMessageResponse {
+  /**
+   * Message id — matches the `id` in delivery webhooks.
+   */
+  id: string;
+
+  /**
+   * Delivery status ("sent" on a live send, "delivered" when simulated).
+   */
+  status: MessageStatus;
+
+  /**
+   * The recipients the group message was sent to.
+   */
+  to: string[];
+
+  /**
+   * Identifier for the group conversation. Present on live sends.
+   */
+  group_message_id?: string;
+
+  /**
+   * True when the send was simulated (test key, or before your account's
+   * domestic verification is approved) and nothing was sent to the carrier.
+   */
+  simulated?: boolean;
+
+  /**
+   * Human-readable note, present on simulated sends.
+   */
+  message?: string;
+}
+
+/**
  * Message status values
  * Note: "sending" was removed as it doesn't exist in the database
  */
@@ -984,6 +1056,140 @@ export interface BatchPreviewResponse {
 }
 
 // ============================================================================
+// AI Message Enhancement
+// ============================================================================
+
+/**
+ * Request to AI-enhance a draft message. Provide `text`, `messageType`, or
+ * both — at least one is required.
+ */
+export interface EnhanceMessageRequest {
+  /**
+   * Draft message text to rewrite. Optional if `messageType` is provided (the
+   * model then generates a suitable message for that type). Only the first 500
+   * characters are considered; the result is trimmed to one SMS segment.
+   */
+  text?: string;
+
+  /**
+   * Hint about the kind of message so the rewrite is targeted (e.g.
+   * "marketing", "transactional"). Optional if `text` is provided.
+   */
+  messageType?: string;
+}
+
+/**
+ * Result of an AI message enhancement.
+ */
+export interface EnhanceMessageResponse {
+  /**
+   * The rewritten message, capped at 160 characters (one SMS segment). When AI
+   * enhancement is unavailable, this falls back to the original `text`.
+   */
+  enhanced: string;
+
+  /**
+   * Short explanation of what changed. An empty string on the fallback path.
+   */
+  explanation: string;
+
+  /**
+   * The model that produced the enhancement, when available.
+   */
+  model?: string;
+}
+
+// ============================================================================
+// Branded Short Links (URL shortening)
+// ============================================================================
+
+/**
+ * Request to mint a branded short link.
+ */
+export interface CreateShortLinkRequest {
+  /**
+   * Destination URL to shorten. Must be an `http://` or `https://` URL.
+   */
+  url: string;
+}
+
+/**
+ * A newly minted branded short link.
+ */
+export interface ShortLink {
+  /** Short code (the segment after the domain, e.g. "Ab3xY7"). */
+  code: string;
+  /** Full branded short URL to share (e.g. "https://sendly.live/l/Ab3xY7"). */
+  shortUrl: string;
+  /** The destination the short link redirects to. */
+  destinationUrl: string;
+}
+
+/**
+ * Options for listing short links.
+ */
+export interface ListShortLinksOptions {
+  /**
+   * Maximum number of links to return (1-200)
+   * @default 50
+   */
+  limit?: number;
+
+  /**
+   * Number of links to skip for pagination
+   * @default 0
+   */
+  offset?: number;
+}
+
+/**
+ * A short link with click analytics, as returned by
+ * {@link LinksResource.list}.
+ */
+export interface ShortLinkListItem {
+  /** Short code (the segment after the domain). */
+  code: string;
+  /** Full branded short URL. */
+  shortUrl: string;
+  /** The destination the short link redirects to. */
+  destinationUrl: string;
+  /** Workspace brand slug segment, or `null` when unbranded. */
+  brandSlug: string | null;
+  /** Total human clicks recorded (link-preview bots are excluded). */
+  clickCount: number;
+  /** Whether the link is disabled (the redirect then returns 404). */
+  disabled: boolean;
+  /** ISO 3166-1 alpha-2 country of the most recent click, or `null`. */
+  lastCountry: string | null;
+  /** When the link was last clicked (ISO 8601), or `null`. */
+  lastClickedAt: string | null;
+  /** When the link was created (ISO 8601). */
+  createdAt: string;
+  /** 14-day daily click histogram, oldest first (today last). */
+  spark: number[];
+}
+
+/**
+ * Response from {@link LinksResource.list}.
+ */
+export interface ShortLinkListResponse {
+  /** The workspace's short links, newest first. */
+  links: ShortLinkListItem[];
+  /** Total number of short links in the workspace. */
+  total: number;
+}
+
+/**
+ * Response from enabling or disabling a short link.
+ */
+export interface ShortLinkDisabledResponse {
+  /** Short code that was updated. */
+  code: string;
+  /** New disabled state. */
+  disabled: boolean;
+}
+
+// ============================================================================
 // Errors
 // ============================================================================
 
@@ -1073,6 +1279,13 @@ export interface RequestOptions {
    * Additional headers
    */
   headers?: Record<string, string>;
+
+  /**
+   * Target the un-versioned API root (`/api`) instead of the versioned base
+   * (`/api/v1`). Used by endpoints that live outside the versioned surface,
+   * such as branded short-link management.
+   */
+  unversioned?: boolean;
 }
 
 /**
@@ -1586,6 +1799,29 @@ export interface ApiKey {
   expiresAt?: string | null;
   /** Whether key is revoked */
   isRevoked: boolean;
+}
+
+/**
+ * A rotated (newly issued) API key. Carries every {@link ApiKey} field plus the
+ * one-time raw secret and a caution to store it.
+ */
+export interface RotatedApiKey extends ApiKey {
+  /** The raw new secret (`sk_…`). Shown only once — store it now. */
+  key: string;
+  /** Human-readable caution about the one-time secret. */
+  warning: string;
+}
+
+/**
+ * Response from rotating an API key (see {@link AccountResource.rotateApiKey}).
+ */
+export interface RotateApiKeyResponse {
+  /** The newly issued key, including its one-time raw `key` and a `warning`. */
+  newKey: RotatedApiKey;
+  /** The predecessor key, now counting down its grace period. */
+  oldKey: ApiKey;
+  /** Human-readable summary (e.g. when the old key expires). */
+  message: string;
 }
 
 // ============================================================================

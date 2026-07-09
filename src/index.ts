@@ -47,10 +47,24 @@ export type {
   BatchMessageResponse,
   ListBatchesOptions,
   BatchListResponse,
+  SendGroupMessageRequest,
+  GroupMessageResponse,
+  EnhanceMessageRequest,
+  EnhanceMessageResponse,
   ApiErrorResponse,
   SendlyErrorCode,
   RateLimitInfo,
   PricingTier,
+} from "./types";
+
+// Types - Links (URL shortening)
+export type {
+  CreateShortLinkRequest,
+  ShortLink,
+  ListShortLinksOptions,
+  ShortLinkListItem,
+  ShortLinkListResponse,
+  ShortLinkDisabledResponse,
 } from "./types";
 
 // Types - Media
@@ -72,7 +86,14 @@ export type {
 } from "./types";
 
 // Types - Account & Credits
-export type { Account, Credits, CreditTransaction, ApiKey } from "./types";
+export type {
+  Account,
+  Credits,
+  CreditTransaction,
+  ApiKey,
+  RotatedApiKey,
+  RotateApiKeyResponse,
+} from "./types";
 
 // Types - Verify (OTP)
 export type {
@@ -223,6 +244,8 @@ export type {
   BuyNumberStatus,
   NumberBuyAction,
   BuyNumberResponse,
+  UpdateNumberRequest,
+  ReleaseNumberResponse,
 } from "./resources/numbers";
 
 // Types - 10DLC

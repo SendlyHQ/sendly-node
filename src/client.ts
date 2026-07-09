@@ -21,6 +21,7 @@ import { RulesResource } from "./resources/rules";
 import { BusinessUpgradeResource } from "./resources/businessUpgrade";
 import { NumbersResource } from "./resources/numbers";
 import { TenDlcResource } from "./resources/tendlc";
+import { LinksResource } from "./resources/links";
 
 const DEFAULT_BASE_URL = "https://sendly.live/api/v1";
 const DEFAULT_TIMEOUT = 30000;
@@ -319,6 +320,24 @@ export class Sendly {
    */
   public readonly tenDlc: TenDlcResource;
 
+  /**
+   * Links API resource — branded URL shortening.
+   *
+   * @example
+   * ```typescript
+   * // Shorten a URL for use in outbound messages
+   * const link = await sendly.links.create({
+   *   url: "https://example.com/spring-sale",
+   * });
+   * console.log(link.shortUrl); // https://sendly.live/l/Ab3xY7
+   *
+   * // List links with click counts, then kill one
+   * const { links } = await sendly.links.list({ limit: 20 });
+   * await sendly.links.disable(links[0].code);
+   * ```
+   */
+  public readonly links: LinksResource;
+
   private readonly http: HttpClient;
   private readonly config: Required<Pick<SendlyConfig, "apiKey" | "baseUrl" | "timeout" | "maxRetries">> & Pick<SendlyConfig, "organizationId">;
 
@@ -371,6 +390,7 @@ export class Sendly {
     this.businessUpgrade = new BusinessUpgradeResource(this.http);
     this.numbers = new NumbersResource(this.http);
     this.tenDlc = new TenDlcResource(this.http);
+    this.links = new LinksResource(this.http);
   }
 
   /**

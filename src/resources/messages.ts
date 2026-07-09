@@ -6,6 +6,10 @@
 import type { HttpClient } from "../utils/http";
 import type {
   SendMessageRequest,
+  SendGroupMessageRequest,
+  GroupMessageResponse,
+  EnhanceMessageRequest,
+  EnhanceMessageResponse,
   Message,
   ListMessagesOptions,
   MessageListResponse,
@@ -99,6 +103,117 @@ export class MessagesResource {
     });
 
     return message;
+  }
+
+  /**
+   * Send a group MMS to 2-8 recipients (US/Canada only)
+   *
+   * Creates a multi-party MMS conversation: every recipient sees the others,
+   * and replies fan out to all participants. Group messaging is an A2P 10DLC
+   * capability — the sending number must be an MMS-enabled, 10DLC-registered
+   * number you own. Omit `from` to use your workspace's default sender.
+   *
+   * @param request - Group message details (2-8 recipients, text and/or media)
+   * @returns The created group message, including a `group_message_id`
+   *
+   * @example
+   * ```typescript
+   * const group = await sendly.messages.sendGroup({
+   *   to: ['+14155551234', '+14155555678'],
+   *   text: 'Hey team - quick sync at noon?',
+   * });
+   *
+   * console.log(group.id);                // msg_xxx
+   * console.log(group.group_message_id);  // grp_xxx
+   * ```
+   *
+   * @throws {ValidationError} If fewer than 2 / more than 8 recipients, or no body
+   * @throws {InsufficientCreditsError} If credit balance is too low (billed per recipient)
+   * @throws {AuthenticationError} If the API key is invalid
+   */
+  async sendGroup(
+    request: SendGroupMessageRequest,
+  ): Promise<GroupMessageResponse> {
+    if (!Array.isArray(request.to) || request.to.length < 2) {
+      throw new Error("Group messaging requires at least 2 recipients in 'to'");
+    }
+    if (request.to.length > 8) {
+      throw new Error("Group messaging supports at most 8 recipients");
+    }
+    for (const recipient of request.to) {
+      validatePhoneNumber(recipient);
+    }
+    const hasMedia =
+      Array.isArray(request.mediaUrls) && request.mediaUrls.length > 0;
+    if (!request.text && !hasMedia) {
+      throw new Error("Provide 'text' or 'mediaUrls'");
+    }
+    if (request.from) {
+      validateSenderId(request.from);
+    }
+
+    const response = await this.http.request<GroupMessageResponse>({
+      method: "POST",
+      path: "/messages/group",
+      body: {
+        to: request.to,
+        ...(request.text && { text: request.text }),
+        ...(request.from && { from: request.from }),
+        ...(hasMedia && { mediaUrls: request.mediaUrls }),
+        ...(request.messageType && { messageType: request.messageType }),
+      },
+    });
+
+    return response;
+  }
+
+  /**
+   * AI-enhance a draft message for clarity, compliance, and send-readiness.
+   *
+   * Rewrites the supplied text into a single, polished SMS segment (≤160
+   * chars) and returns a short explanation of what changed. Pass `messageType`
+   * to steer the rewrite (e.g. "marketing" vs "transactional"); with no `text`
+   * it generates a suitable message for that type instead. At least one of
+   * `text` or `messageType` is required.
+   *
+   * If AI enhancement is unavailable for the account, the response falls back
+   * to the original `text` with an empty `explanation`.
+   *
+   * @param request - The draft text and/or a message-type hint
+   * @returns The enhanced text, an explanation, and the model used
+   *
+   * @example
+   * ```typescript
+   * const result = await sendly.messages.enhance({
+   *   text: 'hey come check out our sale this weekend',
+   *   messageType: 'marketing',
+   * });
+   *
+   * console.log(result.enhanced);     // polished, ≤160-char rewrite
+   * console.log(result.explanation);  // what changed and why
+   * ```
+   *
+   * @throws {ValidationError} If neither `text` nor `messageType` is provided
+   * @throws {NotFoundError} If AI enhancement is not enabled for the account
+   * @throws {AuthenticationError} If the API key is invalid
+   */
+  async enhance(
+    request: EnhanceMessageRequest,
+  ): Promise<EnhanceMessageResponse> {
+    if (!request || (!request.text && !request.messageType)) {
+      throw new Error("Provide 'text' or 'messageType'");
+    }
+
+    const response = await this.http.request<EnhanceMessageResponse>({
+      method: "POST",
+      path: "/ai/enhance",
+      body: {
+        ...(request.text !== undefined && { text: request.text }),
+        ...(request.messageType && { messageType: request.messageType }),
+      },
+    });
+
+    return response;
   }
 
   /**

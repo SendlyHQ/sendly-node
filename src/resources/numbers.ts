@@ -108,6 +108,13 @@ export interface OwnedNumber {
   /** Monthly cost in cents */
   monthlyCostCents: number;
   /**
+   * True if this is the workspace's default sending number. Present on the
+   * single-number responses ({@link NumbersResource.get},
+   * {@link NumbersResource.update}); omitted from the {@link NumbersResource.list}
+   * projection.
+   */
+  isDefault?: boolean;
+  /**
    * When the customer submitted regulatory documents (ISO 8601), or `null`.
    * For a `requirements_required` number: `null` = still needs documents,
    * non-null = documents submitted and under carrier review.
@@ -221,6 +228,41 @@ export interface BuyNumberResponse {
 }
 
 /**
+ * Request body for {@link NumbersResource.update}.
+ *
+ * Supply at least one field. Only these two mutations are supported:
+ *
+ * - `isDefault: true` — make this number the workspace's default sender. The
+ *   number must be `active`, or the call fails with `invalid_state`.
+ * - `pendingCancellation: false` — cancel a previously scheduled release and
+ *   keep the number.
+ *
+ * A body with neither field fails with `no_supported_fields`.
+ */
+export interface UpdateNumberRequest {
+  /** Set to `true` to make this the workspace's default sender (requires `active`). */
+  isDefault?: true;
+  /** Set to `false` to cancel a scheduled release and keep the number. */
+  pendingCancellation?: false;
+}
+
+/**
+ * Response from {@link NumbersResource.release}.
+ *
+ * - Immediate release: `{ success: true }`.
+ * - Scheduled release (a live paid purchase is cancelled at the end of the
+ *   paid period): `{ success: true, scheduled: true, scheduledReleaseAt }`.
+ */
+export interface ReleaseNumberResponse {
+  /** Always `true` on success. */
+  success: true;
+  /** `true` when the release was scheduled for the end of the paid period. */
+  scheduled?: true;
+  /** When the scheduled release takes effect (ISO 8601), when `scheduled`. */
+  scheduledReleaseAt?: string;
+}
+
+/**
  * Numbers resource — discover, buy, and list phone numbers.
  *
  * @example
@@ -329,6 +371,122 @@ export class NumbersResource {
     return this.http.request<ListNumbersResponse>({
       method: "GET",
       path: "/numbers",
+    });
+  }
+
+  /**
+   * Get a single phone number you own by id. Unlike {@link NumbersResource.list},
+   * the returned record includes `isDefault`.
+   *
+   * @param id - The number's id
+   * @returns The full owned-number record
+   *
+   * @example
+   * ```typescript
+   * const number = await sendly.numbers.get("num_xxx");
+   * console.log(`${number.phoneNumber} — default: ${number.isDefault}`);
+   * ```
+   *
+   * @throws {NotFoundError} If no such number exists in your workspace
+   * @throws {AuthenticationError} If the API key is invalid
+   */
+  async get(id: string): Promise<OwnedNumber> {
+    if (!id) {
+      throw new Error("A number 'id' is required");
+    }
+
+    return this.http.request<OwnedNumber>({
+      method: "GET",
+      path: `/numbers/${encodeURIComponent(id)}`,
+    });
+  }
+
+  /**
+   * Update a phone number you own. Supply at least one supported mutation:
+   *
+   * - `isDefault: true` — make this the workspace's default sending number
+   *   (the number must be `active`).
+   * - `pendingCancellation: false` — cancel a previously scheduled release and
+   *   keep the number.
+   *
+   * @param id - The number's id
+   * @param request - The mutation(s) to apply
+   * @returns The updated owned-number record (including `isDefault`)
+   *
+   * @example
+   * ```typescript
+   * // Make a number the default sender
+   * const updated = await sendly.numbers.update("num_xxx", { isDefault: true });
+   *
+   * // Cancel a scheduled release ("keep this number")
+   * await sendly.numbers.update("num_xxx", { pendingCancellation: false });
+   * ```
+   *
+   * @throws {ValidationError} If no supported field is provided, or `isDefault`
+   *   is requested for a non-active number
+   * @throws {NotFoundError} If no such number exists in your workspace
+   * @throws {AuthenticationError} If the API key is invalid
+   */
+  async update(
+    id: string,
+    request: UpdateNumberRequest,
+  ): Promise<OwnedNumber> {
+    if (!id) {
+      throw new Error("A number 'id' is required");
+    }
+    if (
+      !request ||
+      (request.isDefault === undefined &&
+        request.pendingCancellation === undefined)
+    ) {
+      throw new Error(
+        "Provide at least one of { isDefault: true } or { pendingCancellation: false }",
+      );
+    }
+
+    return this.http.request<OwnedNumber>({
+      method: "PATCH",
+      path: `/numbers/${encodeURIComponent(id)}`,
+      body: {
+        ...(request.isDefault !== undefined && { isDefault: request.isDefault }),
+        ...(request.pendingCancellation !== undefined && {
+          pendingCancellation: request.pendingCancellation,
+        }),
+      },
+    });
+  }
+
+  /**
+   * Release a phone number you own. A live paid purchase is cancelled at the
+   * end of the paid period (the response then carries `scheduled: true` and a
+   * `scheduledReleaseAt`); everything else is released immediately.
+   *
+   * @param id - The number's id
+   * @returns `{ success: true }` for an immediate release, or
+   *   `{ success: true, scheduled: true, scheduledReleaseAt }` when scheduled
+   *
+   * @example
+   * ```typescript
+   * const result = await sendly.numbers.release("num_xxx");
+   * if (result.scheduled) {
+   *   console.log(`Releases at ${result.scheduledReleaseAt}`);
+   * } else {
+   *   console.log("Released");
+   * }
+   * ```
+   *
+   * @throws {NotFoundError} If no such number exists in your workspace
+   * @throws {ValidationError} If the carrier release failed
+   * @throws {AuthenticationError} If the API key is invalid
+   */
+  async release(id: string): Promise<ReleaseNumberResponse> {
+    if (!id) {
+      throw new Error("A number 'id' is required");
+    }
+
+    return this.http.request<ReleaseNumberResponse>({
+      method: "DELETE",
+      path: `/numbers/${encodeURIComponent(id)}`,
     });
   }
 

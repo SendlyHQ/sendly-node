@@ -4,7 +4,13 @@
  */
 
 import type { HttpClient } from "../utils/http";
-import type { Account, Credits, CreditTransaction, ApiKey } from "../types";
+import type {
+  Account,
+  Credits,
+  CreditTransaction,
+  ApiKey,
+  RotateApiKeyResponse,
+} from "../types";
 
 /**
  * Account API resource
@@ -297,44 +303,44 @@ export class AccountResource {
   /**
    * Rotate an API key
    *
-   * Creates a new key while optionally keeping the old one active for a grace period.
+   * Issues a new key and keeps the old one working for a grace period so you
+   * can roll callers over without downtime. The new secret's raw value is on
+   * `newKey.key` and is shown only once — store it now.
    *
    * @param id - API key ID to rotate
-   * @param options - Rotation options
-   * @returns New API key with the full key value
+   * @param options - Rotation options. `gracePeriodHours` must be 24-168
+   *   inclusive (default 24) — the window the old key keeps working.
+   * @returns The new key (with its one-time raw `key`), the old key, and a message
    *
    * @example
    * ```typescript
-   * // Rotate immediately (old key stops working instantly)
-   * const { newKey, key } = await sendly.account.rotateApiKey('key_xxx');
-   * console.log(`New key: ${key}`); // Save this!
+   * // Rotate with the default 24-hour grace period
+   * const { newKey, oldKey, message } = await sendly.account.rotateApiKey('key_xxx');
+   * console.log(`New key: ${newKey.key}`); // Save this — shown once!
+   * console.log(message);                  // "Old key will expire in 24 hours"
    *
-   * // Rotate with 24-hour grace period (both keys work for 24h)
-   * const { newKey, key } = await sendly.account.rotateApiKey('key_xxx', {
-   *   gracePeriodHours: 24
-   * });
+   * // Rotate with a 72-hour grace period (both keys work for 72h)
+   * await sendly.account.rotateApiKey('key_xxx', { gracePeriodHours: 72 });
    * ```
+   *
+   * @throws {ValidationError} If `gracePeriodHours` is outside 24-168, or the
+   *   key is inactive / revoked / already rotating
+   * @throws {NotFoundError} If the key doesn't exist
    */
   async rotateApiKey(
     id: string,
     options?: { gracePeriodHours?: number },
-  ): Promise<{ newKey: ApiKey; key: string; oldKeyExpiresAt?: string }> {
+  ): Promise<RotateApiKeyResponse> {
     if (!id) {
       throw new Error("API key ID is required");
     }
 
-    const response = await this.http.request<{
-      newKey: ApiKey;
-      key: string;
-      oldKeyExpiresAt?: string;
-    }>({
+    return this.http.request<RotateApiKeyResponse>({
       method: "POST",
       path: `/account/keys/${encodeURIComponent(id)}/rotate`,
       body: options?.gracePeriodHours
         ? { gracePeriodHours: options.gracePeriodHours }
         : {},
     });
-
-    return response;
   }
 }

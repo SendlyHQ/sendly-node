@@ -86,7 +86,7 @@ export class HttpClient {
    * Make an HTTP request to the API
    */
   async request<T>(options: RequestOptions): Promise<T> {
-    const url = this.buildUrl(options.path, options.query);
+    const url = this.buildUrl(options.path, options.query, options.unversioned);
     const headers = this.buildHeaders(options.headers);
 
     let lastError: Error | undefined;
@@ -264,9 +264,16 @@ export class HttpClient {
   private buildUrl(
     path: string,
     query?: Record<string, string | number | boolean | undefined>,
+    unversioned?: boolean,
   ): string {
     // Remove leading slash from path and ensure baseUrl doesn't end with slash
-    const base = this.config.baseUrl.replace(/\/$/, "");
+    let base = this.config.baseUrl.replace(/\/$/, "");
+    // A few endpoints (branded short-link management) live at the un-versioned
+    // API root (`/api`), not the versioned base (`/api/v1`). Drop the trailing
+    // version segment so those paths resolve correctly.
+    if (unversioned) {
+      base = base.replace(/\/v1$/, "");
+    }
     const cleanPath = path.startsWith("/") ? path.slice(1) : path;
     const fullUrl = `${base}/${cleanPath}`;
     const url = new URL(fullUrl);
