@@ -1421,7 +1421,23 @@ export type WebhookEventType =
   | "contact.auto_flagged"
   | "contact.marked_valid"
   | "contacts.lookup_completed"
-  | "contacts.bulk_marked_valid";
+  | "contacts.bulk_marked_valid"
+  | "brand.verified"
+  | "brand.failed"
+  | "campaign.approved"
+  | "campaign.rejected"
+  | "campaign.suspended"
+  | "assignment.confirmed"
+  | "assignment.failed"
+  | "port.completed"
+  | "port_out.requested"
+  | "port_out.completed"
+  | "port_out.rejected"
+  | "port_out.cancelled"
+  | "number.activated"
+  | "number.failed"
+  | "number.requirements_required"
+  | "number.released";
 
 /**
  * Source of a list-health event. Frozen enum — new values will be
