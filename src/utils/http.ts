@@ -299,7 +299,7 @@ export class HttpClient {
       Authorization: `Bearer ${this.config.apiKey}`,
       "Content-Type": "application/json",
       Accept: "application/json",
-      "User-Agent": "@sendly/node/1.0.5",
+      "User-Agent": "@sendly/node/3.37.0",
       ...additionalHeaders,
     };
 
