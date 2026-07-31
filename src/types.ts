@@ -47,9 +47,22 @@ export interface SendlyConfig {
 export type MessageType = "marketing" | "transactional";
 
 /**
+ * Message channel. Messages are SMS unless a request opts into another
+ * channel.
+ */
+export type MessageChannel = "sms" | "whatsapp";
+
+/**
  * Request payload for sending an SMS message
  */
 export interface SendMessageRequest {
+  /**
+   * Message channel. Omit (or pass "sms") for SMS. To send on WhatsApp,
+   * pass a {@link SendWhatsAppMessageRequest} (`channel: "whatsapp"`)
+   * instead — it has its own required fields and response shape.
+   */
+  channel?: "sms";
+
   /**
    * Destination phone number in E.164 format (e.g., +15551234567)
    */
@@ -89,6 +102,211 @@ export interface SendMessageRequest {
    * Must be publicly accessible HTTPS URLs. Max 10 per message.
    */
   mediaUrls?: string[];
+}
+
+/**
+ * Variable values for one dynamic-URL button on an approved WhatsApp
+ * template.
+ */
+export interface WhatsAppTemplateButtonVariables {
+  /**
+   * Zero-based index of the button on the approved template
+   */
+  index: number;
+
+  /**
+   * Values for the button's URL placeholders, keyed by placeholder number:
+   * { "1": "4821" }
+   */
+  variables: Record<string, string>;
+}
+
+/**
+ * The approved WhatsApp template to send, with its variable values.
+ */
+export interface WhatsAppTemplateSendParams {
+  /**
+   * Template name as approved (e.g. "order_shipped")
+   */
+  name: string;
+
+  /**
+   * Template language code (e.g. "en_US") — must match the approved
+   * template's language exactly
+   */
+  language: string;
+
+  /**
+   * Body variable values keyed by placeholder number:
+   * { "1": "Acme Inc", "2": "#4821" }
+   */
+  variables?: Record<string, string>;
+
+  /**
+   * Variable values for dynamic-URL buttons
+   */
+  buttons?: WhatsAppTemplateButtonVariables[];
+}
+
+/**
+ * Request payload for sending a WhatsApp message.
+ *
+ * Provide exactly one of:
+ * - `text` — free-form text; only deliverable inside an open 24-hour
+ *   customer-service window (the recipient messaged you in the last 24h)
+ * - `mediaUrls` — a single media attachment (optional `text` becomes its
+ *   caption); also window-bound
+ * - `template` — an approved template; works regardless of the window
+ *
+ * WhatsApp sends require a live API key and a `from` number that has been
+ * connected to WhatsApp (see `sendly.whatsapp.signup`).
+ */
+export interface SendWhatsAppMessageRequest {
+  /**
+   * Selects the WhatsApp channel
+   */
+  channel: "whatsapp";
+
+  /**
+   * Destination phone number in E.164 format (e.g., +15551234567)
+   */
+  to: string;
+
+  /**
+   * Sending number in E.164 format. Required — must be one of your numbers
+   * with an active WhatsApp connection.
+   */
+  from: string;
+
+  /**
+   * Free-form message text (max 4096 bytes), or the caption when
+   * `mediaUrls` is provided (max 1024 bytes). Requires an open 24-hour
+   * window — outside it the API responds 422 `whatsapp_window_closed`;
+   * send a `template` instead.
+   */
+  text?: string;
+
+  /**
+   * Media attachment URL. WhatsApp accepts exactly one per message.
+   * Must be a publicly accessible HTTPS URL.
+   */
+  mediaUrls?: string[];
+
+  /**
+   * Approved template to send. Works regardless of the 24-hour window.
+   */
+  template?: WhatsAppTemplateSendParams;
+
+  /**
+   * Custom JSON metadata to attach to the message (max 4KB).
+   */
+  metadata?: Record<string, any>;
+}
+
+/**
+ * What kind of WhatsApp message was sent
+ */
+export type WhatsAppMessageKind = "text" | "media" | "template";
+
+/**
+ * Billing category of a sent WhatsApp template (Meta reviews and may
+ * reclassify templates; the category on the send response is what was
+ * billed).
+ */
+export type WhatsAppMessageCategory =
+  | "marketing"
+  | "utility"
+  | "authentication";
+
+/**
+ * WhatsApp-specific details on a sent message
+ */
+export interface WhatsAppMessageDetails {
+  /**
+   * What was sent: free-form text, media, or a template
+   */
+  kind: WhatsAppMessageKind;
+
+  /**
+   * The template that was sent (template sends only)
+   */
+  template?: {
+    name: string;
+    language: string;
+    category: WhatsAppMessageCategory;
+  };
+
+  /**
+   * WhatsApp message id — null until the first delivery report lands;
+   * populated on the message record afterwards
+   */
+  messageId: string | null;
+}
+
+/**
+ * A sent WhatsApp message
+ */
+export interface WhatsAppMessage {
+  /**
+   * Unique message identifier
+   */
+  id: string;
+
+  /**
+   * Always "whatsapp"
+   */
+  channel: "whatsapp";
+
+  /**
+   * Always "whatsapp"
+   */
+  message_format: "whatsapp";
+
+  /**
+   * Destination phone number
+   */
+  to: string;
+
+  /**
+   * Sending number
+   */
+  from: string;
+
+  /**
+   * Body text for free-form text sends; null for template and media sends
+   */
+  text: string | null;
+
+  /**
+   * Current delivery status
+   */
+  status: MessageStatus;
+
+  /**
+   * Always 1 — WhatsApp has no segment concept
+   */
+  segments: number;
+
+  /**
+   * Credits charged for this message (priced by destination country and
+   * category)
+   */
+  creditsUsed: number;
+
+  /**
+   * WhatsApp-specific details
+   */
+  whatsapp: WhatsAppMessageDetails;
+
+  /**
+   * ISO 8601 timestamp when the message was created
+   */
+  createdAt: string;
+
+  /**
+   * Custom JSON metadata attached to the message
+   */
+  metadata?: Record<string, any>;
 }
 
 /**
@@ -1210,6 +1428,14 @@ export type SendlyErrorCode =
   | "unsupported_destination"
   | "not_found"
   | "rate_limit_exceeded"
+  | "whatsapp_not_enabled"
+  | "whatsapp_requires_live_key"
+  | "whatsapp_sender_not_connected"
+  | "whatsapp_window_closed"
+  | "whatsapp_template_not_found"
+  | "whatsapp_template_not_approved"
+  | "whatsapp_invalid_content"
+  | "whatsapp_send_failed"
   | "internal_error";
 
 /**

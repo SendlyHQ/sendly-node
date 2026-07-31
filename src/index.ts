@@ -57,6 +57,36 @@ export type {
   PricingTier,
 } from "./types";
 
+// Types - WhatsApp (send)
+export type {
+  MessageChannel,
+  SendWhatsAppMessageRequest,
+  WhatsAppTemplateSendParams,
+  WhatsAppTemplateButtonVariables,
+  WhatsAppMessageKind,
+  WhatsAppMessageCategory,
+  WhatsAppMessageDetails,
+  WhatsAppMessage,
+} from "./types";
+
+// Types - WhatsApp (signup, templates, window)
+export type {
+  WhatsAppSignupStatus,
+  StartWhatsAppSignupRequest,
+  WhatsAppSignupSession,
+  WhatsAppSignup,
+  WhatsAppTemplateCategory,
+  WhatsAppTemplateStatus,
+  WhatsAppTemplateButton,
+  CreateWhatsAppTemplateRequest,
+  UpdateWhatsAppTemplateRequest,
+  WhatsAppTemplate,
+  WhatsAppTemplateListResponse,
+  WhatsAppTemplateDeletedResponse,
+  WhatsAppWindowOptions,
+  WhatsAppWindow,
+} from "./resources/whatsapp";
+
 // Types - Links (URL shortening)
 export type {
   CreateShortLinkRequest,

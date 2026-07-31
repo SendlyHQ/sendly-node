@@ -6,6 +6,8 @@
 import type { HttpClient } from "../utils/http";
 import type {
   SendMessageRequest,
+  SendWhatsAppMessageRequest,
+  WhatsAppMessage,
   SendGroupMessageRequest,
   GroupMessageResponse,
   EnhanceMessageRequest,
@@ -58,6 +60,51 @@ export class MessagesResource {
   }
 
   /**
+   * Send a WhatsApp message
+   *
+   * Requires a live API key and a `from` number with an active WhatsApp
+   * connection (see `sendly.whatsapp.signup`). Free-form `text` and media
+   * only deliver inside an open 24-hour customer-service window — outside
+   * it, send an approved `template` instead (check with
+   * `sendly.whatsapp.window()`).
+   *
+   * @param request - WhatsApp message details (`channel: 'whatsapp'`)
+   * @returns The created WhatsApp message
+   *
+   * @example
+   * ```typescript
+   * // Free-form reply inside an open 24h window
+   * const message = await sendly.messages.send({
+   *   channel: 'whatsapp',
+   *   to: '+15551234567',
+   *   from: '+15559876543',
+   *   text: 'Your table is ready!'
+   * });
+   *
+   * // Template send — works regardless of the window
+   * const message = await sendly.messages.send({
+   *   channel: 'whatsapp',
+   *   to: '+15551234567',
+   *   from: '+15559876543',
+   *   template: {
+   *     name: 'order_shipped',
+   *     language: 'en_US',
+   *     variables: { '1': 'Acme Inc', '2': '#4821' }
+   *   }
+   * });
+   *
+   * console.log(message.whatsapp.kind);  // 'template'
+   * console.log(message.creditsUsed);    // priced by country + category
+   * ```
+   *
+   * @throws {ValidationError} If the request is invalid
+   * @throws {InsufficientCreditsError} If credit balance is too low
+   * @throws {AuthenticationError} If the API key is invalid
+   * @throws {RateLimitError} If rate limit is exceeded
+   */
+  async send(request: SendWhatsAppMessageRequest): Promise<WhatsAppMessage>;
+
+  /**
    * Send an SMS message
    *
    * @param request - Message details
@@ -80,9 +127,39 @@ export class MessagesResource {
    * @throws {AuthenticationError} If the API key is invalid
    * @throws {RateLimitError} If rate limit is exceeded
    */
-  async send(request: SendMessageRequest): Promise<Message> {
+  async send(request: SendMessageRequest): Promise<Message>;
+
+  async send(
+    request: SendMessageRequest | SendWhatsAppMessageRequest,
+  ): Promise<Message | WhatsAppMessage> {
     // Validate request
     validatePhoneNumber(request.to);
+
+    if (request.channel === "whatsapp") {
+      validatePhoneNumber(request.from);
+      const hasMedia =
+        Array.isArray(request.mediaUrls) && request.mediaUrls.length > 0;
+      if (!request.text && !hasMedia && !request.template) {
+        throw new Error("Provide 'text', 'mediaUrls', or 'template'");
+      }
+
+      const message = await this.http.request<WhatsAppMessage>({
+        method: "POST",
+        path: "/messages",
+        body: {
+          channel: "whatsapp",
+          to: request.to,
+          from: request.from,
+          ...(request.text !== undefined && { text: request.text }),
+          ...(hasMedia && { mediaUrls: request.mediaUrls }),
+          ...(request.template && { template: request.template }),
+          ...(request.metadata && { metadata: request.metadata }),
+        },
+      });
+
+      return message;
+    }
+
     validateMessageText(request.text);
     if (request.from) {
       validateSenderId(request.from);

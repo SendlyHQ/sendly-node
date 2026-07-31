@@ -22,6 +22,7 @@ import { BusinessUpgradeResource } from "./resources/businessUpgrade";
 import { NumbersResource } from "./resources/numbers";
 import { TenDlcResource } from "./resources/tendlc";
 import { LinksResource } from "./resources/links";
+import { WhatsAppResource } from "./resources/whatsapp";
 
 const DEFAULT_BASE_URL = "https://sendly.live/api/v1";
 const DEFAULT_TIMEOUT = 30000;
@@ -338,6 +339,48 @@ export class Sendly {
    */
   public readonly links: LinksResource;
 
+  /**
+   * WhatsApp API resource — connect senders, manage templates, check
+   * 24-hour windows.
+   *
+   * Connecting a number is a one-time $19 setup (no monthly fee) and ends
+   * with a human step: hand the returned `connectUrl` to your user — they
+   * open it in a browser and log in with Facebook to link their WhatsApp
+   * Business Account.
+   *
+   * @example
+   * ```typescript
+   * // Connect a number, then hand the URL to a human
+   * const signup = await sendly.whatsapp.signup.create({
+   *   phoneNumber: '+15559876543',
+   * });
+   * console.log(`Have your user open: ${signup.connectUrl}`);
+   *
+   * // Poll until active
+   * const status = await sendly.whatsapp.signup.get(signup.id);
+   *
+   * // Create a template (Meta reviews it, usually 24-48h)
+   * await sendly.whatsapp.templates.create({
+   *   sender: '+15559876543',
+   *   name: 'order_shipped',
+   *   language: 'en_US',
+   *   category: 'UTILITY',
+   *   body: 'Hi {{1}}, your order {{2}} has shipped!',
+   *   examples: { '1': 'Sam', '2': '#4821' },
+   * });
+   *
+   * // Send via messages.send with channel: 'whatsapp'
+   * await sendly.messages.send({
+   *   channel: 'whatsapp',
+   *   to: '+15551234567',
+   *   from: '+15559876543',
+   *   template: { name: 'order_shipped', language: 'en_US',
+   *     variables: { '1': 'Sam', '2': '#4821' } },
+   * });
+   * ```
+   */
+  public readonly whatsapp: WhatsAppResource;
+
   private readonly http: HttpClient;
   private readonly config: Required<Pick<SendlyConfig, "apiKey" | "baseUrl" | "timeout" | "maxRetries">> & Pick<SendlyConfig, "organizationId">;
 
@@ -391,6 +434,7 @@ export class Sendly {
     this.numbers = new NumbersResource(this.http);
     this.tenDlc = new TenDlcResource(this.http);
     this.links = new LinksResource(this.http);
+    this.whatsapp = new WhatsAppResource(this.http);
   }
 
   /**
