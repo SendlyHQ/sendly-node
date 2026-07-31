@@ -69,12 +69,15 @@ export type {
   WhatsAppMessage,
 } from "./types";
 
-// Types - WhatsApp (signup, templates, window)
+// Types - WhatsApp (signup, senders, templates, window)
 export type {
   WhatsAppSignupStatus,
   StartWhatsAppSignupRequest,
   WhatsAppSignupSession,
   WhatsAppSignup,
+  WhatsAppSenderStatus,
+  WhatsAppSender,
+  WhatsAppSendersList,
   WhatsAppTemplateCategory,
   WhatsAppTemplateStatus,
   WhatsAppTemplateButton,

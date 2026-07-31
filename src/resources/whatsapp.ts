@@ -94,6 +94,41 @@ export interface WhatsAppSignup {
 }
 
 /**
+ * Connection status of a WhatsApp sender.
+ *
+ * - `pending` — the connection is still in progress; not sendable yet
+ * - `active` — connected; the number can send and receive on WhatsApp
+ * - `suspended` — sending is currently suspended for this number
+ */
+export type WhatsAppSenderStatus = "pending" | "active" | "suspended";
+
+/**
+ * A number connected (or connecting) to WhatsApp.
+ */
+export interface WhatsAppSender {
+  /** The sender, in E.164 format */
+  phoneNumber: string;
+  /**
+   * The name recipients see — chosen during the connect flow and reviewed
+   * by Meta; null until set
+   */
+  displayName: string | null;
+  /** Connection status */
+  status: WhatsAppSenderStatus;
+  /** Meta quality rating (e.g. "GREEN"), or null before first rating */
+  qualityRating: string | null;
+  /** ISO 8601 timestamp when the sender was connected */
+  createdAt: string;
+}
+
+/**
+ * Response from {@link WhatsAppSendersResource.list}.
+ */
+export interface WhatsAppSendersList {
+  senders: WhatsAppSender[];
+}
+
+/**
  * Template category. Meta reviews every template and may reclassify it —
  * the category on the record is authoritative and drives per-message
  * pricing.
@@ -340,6 +375,38 @@ class WhatsAppSignupResource {
   }
 }
 
+class WhatsAppSendersResource {
+  private readonly http: HttpClient;
+
+  constructor(http: HttpClient) {
+    this.http = http;
+  }
+
+  /**
+   * List your WhatsApp senders.
+   *
+   * Returns the numbers connected (or connecting) to WhatsApp on your
+   * workspace, newest first. An empty list means no number is connected
+   * yet — start one with {@link WhatsAppSignupResource.create}.
+   *
+   * @returns Your senders with connection status and quality rating
+   *
+   * @example
+   * ```typescript
+   * const { senders } = await sendly.whatsapp.senders.list();
+   * for (const s of senders) {
+   *   console.log(`${s.phoneNumber} (${s.displayName ?? 'no name yet'}) — ${s.status}`);
+   * }
+   * ```
+   */
+  async list(): Promise<WhatsAppSendersList> {
+    return this.http.request<WhatsAppSendersList>({
+      method: "GET",
+      path: "/whatsapp/senders",
+    });
+  }
+}
+
 class WhatsAppTemplatesResource {
   private readonly http: HttpClient;
 
@@ -533,6 +600,11 @@ export class WhatsAppResource {
   public readonly signup: WhatsAppSignupResource;
 
   /**
+   * List the numbers connected (or connecting) to WhatsApp.
+   */
+  public readonly senders: WhatsAppSendersResource;
+
+  /**
    * Manage Meta-reviewed message templates.
    */
   public readonly templates: WhatsAppTemplatesResource;
@@ -540,6 +612,7 @@ export class WhatsAppResource {
   constructor(http: HttpClient) {
     this.http = http;
     this.signup = new WhatsAppSignupResource(http);
+    this.senders = new WhatsAppSendersResource(http);
     this.templates = new WhatsAppTemplatesResource(http);
   }
 
