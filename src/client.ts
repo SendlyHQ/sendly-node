@@ -23,6 +23,7 @@ import { NumbersResource } from "./resources/numbers";
 import { TenDlcResource } from "./resources/tendlc";
 import { LinksResource } from "./resources/links";
 import { WhatsAppResource } from "./resources/whatsapp";
+import { RcsResource } from "./resources/rcs";
 
 const DEFAULT_BASE_URL = "https://sendly.live/api/v1";
 const DEFAULT_TIMEOUT = 30000;
@@ -381,6 +382,37 @@ export class Sendly {
    */
   public readonly whatsapp: WhatsAppResource;
 
+  /**
+   * RCS API resource — discover agents and pre-flight recipient
+   * capability.
+   *
+   * Sending as your brand requires an RCS agent (the verified sender
+   * identity recipients see), registered per workspace through carrier
+   * review — contact support to register one. Sends go through
+   * `messages.send` with `channel: 'rcs'`; text messages fall back to
+   * SMS automatically when the recipient doesn't support RCS.
+   *
+   * @example
+   * ```typescript
+   * // Find your sendable agent
+   * const { agents } = await sendly.rcs.agents.list();
+   *
+   * // Optionally pre-flight the recipient
+   * const { capable } = await sendly.rcs.capability({ to: '+15551234567' });
+   *
+   * // Send via messages.send with channel: 'rcs'
+   * const message = await sendly.messages.send({
+   *   channel: 'rcs',
+   *   to: '+15551234567',
+   *   text: 'Your table is ready!',
+   * });
+   * if (message.channel === 'sms') {
+   *   console.log('Recipient not RCS-capable — delivered as SMS');
+   * }
+   * ```
+   */
+  public readonly rcs: RcsResource;
+
   private readonly http: HttpClient;
   private readonly config: Required<Pick<SendlyConfig, "apiKey" | "baseUrl" | "timeout" | "maxRetries">> & Pick<SendlyConfig, "organizationId">;
 
@@ -435,6 +467,7 @@ export class Sendly {
     this.tenDlc = new TenDlcResource(this.http);
     this.links = new LinksResource(this.http);
     this.whatsapp = new WhatsAppResource(this.http);
+    this.rcs = new RcsResource(this.http);
   }
 
   /**

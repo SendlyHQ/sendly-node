@@ -8,6 +8,8 @@ import type {
   SendMessageRequest,
   SendWhatsAppMessageRequest,
   WhatsAppMessage,
+  SendRcsMessageRequest,
+  RcsMessage,
   SendGroupMessageRequest,
   GroupMessageResponse,
   EnhanceMessageRequest,
@@ -105,6 +107,61 @@ export class MessagesResource {
   async send(request: SendWhatsAppMessageRequest): Promise<WhatsAppMessage>;
 
   /**
+   * Send an RCS message
+   *
+   * Requires a live API key and a sendable RCS agent on your workspace
+   * (see `sendly.rcs.agents`). Provide exactly one of `text` (optionally
+   * with `suggestions` chips) or `card` (a rich card). When the recipient
+   * doesn't support RCS, text sends fall back to SMS automatically —
+   * check `channel` (or `fellBackTo`) on the response to tell which leg
+   * delivered. Rich cards have no SMS form and respond 422 for non-RCS
+   * recipients.
+   *
+   * @param request - RCS message details (`channel: 'rcs'`)
+   * @returns The created message — sent over RCS, or as SMS when it fell back
+   *
+   * @example
+   * ```typescript
+   * // Text with suggestion chips — falls back to SMS (chips dropped)
+   * // when the recipient doesn't support RCS
+   * const message = await sendly.messages.send({
+   *   channel: 'rcs',
+   *   to: '+15551234567',
+   *   text: 'Your table is ready!',
+   *   suggestions: [
+   *     { reply: { text: 'On my way', postbackData: 'omw' } },
+   *   ],
+   * });
+   *
+   * if (message.channel === 'rcs') {
+   *   console.log(message.rcs.agentName);  // delivered over RCS
+   * } else {
+   *   console.log(message.fellBackTo);     // 'sms'
+   * }
+   *
+   * // Rich card — RCS-capable recipients only
+   * const card = await sendly.messages.send({
+   *   channel: 'rcs',
+   *   to: '+15551234567',
+   *   card: {
+   *     title: 'Your order has shipped',
+   *     description: 'Arriving Thursday',
+   *     mediaUrl: 'https://example.com/package.jpg',
+   *     suggestions: [
+   *       { action: { text: 'Track it', postbackData: 'track', url: 'https://example.com/track' } },
+   *     ],
+   *   },
+   * });
+   * ```
+   *
+   * @throws {ValidationError} If the request is invalid
+   * @throws {InsufficientCreditsError} If credit balance is too low
+   * @throws {AuthenticationError} If the API key is invalid
+   * @throws {RateLimitError} If rate limit is exceeded
+   */
+  async send(request: SendRcsMessageRequest): Promise<RcsMessage>;
+
+  /**
    * Send an SMS message
    *
    * @param request - Message details
@@ -130,10 +187,40 @@ export class MessagesResource {
   async send(request: SendMessageRequest): Promise<Message>;
 
   async send(
-    request: SendMessageRequest | SendWhatsAppMessageRequest,
-  ): Promise<Message | WhatsAppMessage> {
+    request:
+      | SendMessageRequest
+      | SendWhatsAppMessageRequest
+      | SendRcsMessageRequest,
+  ): Promise<Message | WhatsAppMessage | RcsMessage> {
     // Validate request
     validatePhoneNumber(request.to);
+
+    if (request.channel === "rcs") {
+      const hasText = typeof request.text === "string" && request.text.length > 0;
+      const hasCard = !!request.card;
+      if (hasText === hasCard) {
+        throw new Error("Provide exactly one of 'text' or 'card'");
+      }
+
+      const message = await this.http.request<RcsMessage>({
+        method: "POST",
+        path: "/messages",
+        body: {
+          channel: "rcs",
+          to: request.to,
+          ...(request.agentId && { agentId: request.agentId }),
+          ...(hasText && { text: request.text }),
+          ...(hasCard && { card: request.card }),
+          ...(request.suggestions && { suggestions: request.suggestions }),
+          ...(request.fallbackToSms !== undefined && {
+            fallbackToSms: request.fallbackToSms,
+          }),
+          ...(request.metadata && { metadata: request.metadata }),
+        },
+      });
+
+      return message;
+    }
 
     if (request.channel === "whatsapp") {
       validatePhoneNumber(request.from);

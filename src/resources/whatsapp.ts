@@ -129,6 +129,52 @@ export interface WhatsAppSendersList {
 }
 
 /**
+ * A WhatsApp sender's business profile — what recipients see when they
+ * open your business in WhatsApp.
+ */
+export interface WhatsAppSenderProfile {
+  /** The sender, in E.164 format */
+  phoneNumber: string;
+  /** The business name recipients see; null until set */
+  displayName: string | null;
+  /** Profile photo URL; null when none is set */
+  profilePhotoUrl: string | null;
+  /** Business category (e.g. "Restaurant"); null when none is set */
+  category: string | null;
+  /** Short profile line (max 139 chars); null when none is set */
+  about: string | null;
+  /** Longer business description (max 512 chars); null when none is set */
+  description: string | null;
+  /** Contact email shown on the profile; null when none is set */
+  email: string | null;
+  /** Website shown on the profile; null when none is set */
+  website: string | null;
+  /** Business address shown on the profile; null when none is set */
+  address: string | null;
+}
+
+/**
+ * Request body for {@link WhatsAppSendersResource.updateProfile}. Supply
+ * only the fields to change; omitted fields keep their current value.
+ */
+export interface UpdateWhatsAppSenderProfileRequest {
+  /** The business name recipients see */
+  displayName?: string;
+  /** Short profile line (max 139 chars) */
+  about?: string;
+  /** Longer business description (max 512 chars) */
+  description?: string;
+  /** Business category (e.g. "Restaurant") */
+  category?: string;
+  /** Contact email shown on the profile */
+  email?: string;
+  /** Website shown on the profile */
+  website?: string;
+  /** Business address shown on the profile */
+  address?: string;
+}
+
+/**
  * Template category. Meta reviews every template and may reclassify it —
  * the category on the record is authoritative and drives per-message
  * pricing.
@@ -405,6 +451,82 @@ class WhatsAppSendersResource {
       path: "/whatsapp/senders",
     });
   }
+
+  /**
+   * Get a WhatsApp sender's business profile.
+   *
+   * Returns what recipients see when they open your business in
+   * WhatsApp. The sender must have an active WhatsApp connection.
+   *
+   * @param phoneNumber - Your WhatsApp-connected sending number, in E.164 format
+   * @returns The sender's business profile
+   *
+   * @example
+   * ```typescript
+   * const profile = await sendly.whatsapp.senders.getProfile('+15559876543');
+   *
+   * console.log(profile.displayName);  // 'Acme Coffee'
+   * console.log(profile.about);        // 'Fresh roasts daily'
+   * ```
+   *
+   * @throws {NotFoundError} If the number isn't connected to WhatsApp
+   */
+  async getProfile(phoneNumber: string): Promise<WhatsAppSenderProfile> {
+    validatePhoneNumber(phoneNumber);
+
+    return this.http.request<WhatsAppSenderProfile>({
+      method: "GET",
+      path: `/whatsapp/senders/${encodeURIComponent(phoneNumber)}/profile`,
+    });
+  }
+
+  /**
+   * Update a WhatsApp sender's business profile.
+   *
+   * Supply only the fields to change — omitted fields keep their current
+   * value. `about` is capped at 139 characters and `description` at 512.
+   * Requires a live API key.
+   *
+   * @param phoneNumber - Your WhatsApp-connected sending number, in E.164 format
+   * @param request - The profile fields to change (at least one)
+   * @returns The updated business profile
+   *
+   * @example
+   * ```typescript
+   * const profile = await sendly.whatsapp.senders.updateProfile('+15559876543', {
+   *   about: 'Fresh roasts daily',
+   *   website: 'https://acme.example.com',
+   * });
+   * ```
+   *
+   * @throws {ValidationError} If a field is unknown, not a string, or too long
+   * @throws {NotFoundError} If the number isn't connected to WhatsApp
+   * @throws {AuthenticationError} If the API key is invalid or a test key
+   */
+  async updateProfile(
+    phoneNumber: string,
+    request: UpdateWhatsAppSenderProfileRequest,
+  ): Promise<WhatsAppSenderProfile> {
+    validatePhoneNumber(phoneNumber);
+
+    return this.http.request<WhatsAppSenderProfile>({
+      method: "PATCH",
+      path: `/whatsapp/senders/${encodeURIComponent(phoneNumber)}/profile`,
+      body: {
+        ...(request.displayName !== undefined && {
+          displayName: request.displayName,
+        }),
+        ...(request.about !== undefined && { about: request.about }),
+        ...(request.description !== undefined && {
+          description: request.description,
+        }),
+        ...(request.category !== undefined && { category: request.category }),
+        ...(request.email !== undefined && { email: request.email }),
+        ...(request.website !== undefined && { website: request.website }),
+        ...(request.address !== undefined && { address: request.address }),
+      },
+    });
+  }
 }
 
 class WhatsAppTemplatesResource {
@@ -600,7 +722,8 @@ export class WhatsAppResource {
   public readonly signup: WhatsAppSignupResource;
 
   /**
-   * List the numbers connected (or connecting) to WhatsApp.
+   * List the numbers connected (or connecting) to WhatsApp, and read or
+   * update their business profiles.
    */
   public readonly senders: WhatsAppSendersResource;
 

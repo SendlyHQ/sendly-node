@@ -483,6 +483,151 @@ const { data: campaigns } = await sendly.tenDlc.listCampaigns();
 const { data: assignments } = await sendly.tenDlc.listAssignments();
 ```
 
+## WhatsApp
+
+Connect a number you own to WhatsApp ($19 one-time, no monthly fee), create
+Meta-reviewed message templates, and send on the `whatsapp` channel.
+Connecting always ends with a human step: hand the `connectUrl` to your user -
+they open it in a browser and log in with Facebook to link their WhatsApp
+Business Account. Free-form text and media only deliver inside an open 24-hour
+window (the recipient messaged you in the last 24h); an approved template
+works anytime. Requires a live API key.
+
+```typescript
+// 1. Connect a number (a person must finish the connect URL in a browser)
+const signup = await sendly.whatsapp.signup.create({
+  phoneNumber: '+15559876543',
+});
+console.log(`Open ${signup.connectUrl} and log in with Facebook`);
+// ...poll sendly.whatsapp.signup.get(signup.id) until status === 'active'
+// (or 'failed', with failureReasons explaining why)
+
+// 2. Create a template (Meta reviews it, usually 24-48h)
+const template = await sendly.whatsapp.templates.create({
+  sender: '+15559876543',
+  name: 'order_shipped',
+  language: 'en_US',
+  category: 'UTILITY',
+  body: 'Hi {{1}}, your order {{2}} has shipped!',
+  examples: { '1': 'Sam', '2': '#4821' },
+});
+// ...poll sendly.whatsapp.templates.list() until its status === 'APPROVED'
+// (a rejected template should be edited with templates.update() and
+// resubmitted - deleting locks its name for ~30 days)
+
+// 3. Send - free-form inside an open 24h window, template anytime
+const { open } = await sendly.whatsapp.window({
+  from: '+15559876543',
+  to: '+15551234567',
+});
+const message = open
+  ? await sendly.messages.send({
+      channel: 'whatsapp',
+      to: '+15551234567',
+      from: '+15559876543',
+      text: 'Your table is ready!',
+    })
+  : await sendly.messages.send({
+      channel: 'whatsapp',
+      to: '+15551234567',
+      from: '+15559876543',
+      template: {
+        name: 'order_shipped',
+        language: 'en_US',
+        variables: { '1': 'Sam', '2': '#4821' },
+      },
+    });
+console.log(message.whatsapp.kind); // 'text' or 'template'
+
+// Media with a caption (window-bound, one attachment per message)
+await sendly.messages.send({
+  channel: 'whatsapp',
+  to: '+15551234567',
+  from: '+15559876543',
+  text: 'Here is the menu',
+  mediaUrls: ['https://example.com/menu.jpg'],
+});
+
+// List your connected senders
+const { senders } = await sendly.whatsapp.senders.list();
+for (const s of senders) {
+  console.log(`${s.phoneNumber} (${s.displayName}) - ${s.status}`);
+}
+
+// Read and update a sender's business profile (what recipients see)
+const profile = await sendly.whatsapp.senders.getProfile('+15559876543');
+console.log(profile.displayName, profile.about);
+
+await sendly.whatsapp.senders.updateProfile('+15559876543', {
+  about: 'Fresh roasts daily',            // max 139 chars
+  description: 'Small-batch coffee, roasted in-house every morning.', // max 512
+  website: 'https://acme.example.com',
+});
+```
+
+## RCS
+
+Send branded, verified-sender messages on Android: rich cards, suggestion
+chips, and read receipts. Sending as your brand requires an RCS agent (the
+verified identity recipients see), registered per workspace through carrier
+review - contact support to register one. Text messages automatically fall
+back to SMS when the recipient's device or network doesn't support RCS
+(billed as SMS; suggestion chips are dropped); rich cards have no SMS form
+and respond 422 instead. Requires a live API key.
+
+```typescript
+// Your registered agents ('testing' or 'approved' agents are sendable)
+const { agents } = await sendly.rcs.agents.list();
+console.log(agents[0].name, agents[0].status, agents[0].sendable);
+
+// Optionally pre-flight a recipient (live carrier-backed probe)
+const { capable, features } = await sendly.rcs.capability({
+  to: '+15551234567',
+});
+
+// Text with suggestion chips - falls back to SMS for non-RCS recipients
+const message = await sendly.messages.send({
+  channel: 'rcs',
+  to: '+15551234567',
+  text: 'Your table is ready!',
+  suggestions: [
+    { reply: { text: 'On my way', postbackData: 'omw' } },
+    { action: { text: 'View menu', postbackData: 'menu', url: 'https://example.com/menu' } },
+  ],
+});
+
+// The response tells you which leg delivered
+if (message.channel === 'rcs') {
+  console.log(message.rcs.agentName); // delivered over RCS
+} else {
+  console.log(message.fellBackTo);            // 'sms'
+  console.log(message.rcs.suggestionsDropped); // true - chips have no SMS form
+}
+
+// Rich card (RCS-capable recipients only - no SMS form)
+await sendly.messages.send({
+  channel: 'rcs',
+  to: '+15551234567',
+  card: {
+    title: 'Your order has shipped',
+    description: 'Arriving Thursday',
+    mediaUrl: 'https://example.com/package.jpg', // public JPEG/PNG/GIF
+    orientation: 'vertical',
+    suggestions: [
+      { action: { text: 'Track it', postbackData: 'track', url: 'https://example.com/track' } },
+    ],
+  },
+});
+
+// Opt out of the SMS fallback to get a 422 for non-RCS recipients instead
+await sendly.messages.send({
+  channel: 'rcs',
+  to: '+15551234567',
+  text: 'Your table is ready!',
+  fallbackToSms: false,
+});
+```
+
 ## Error Handling
 
 The SDK provides typed error classes for different error scenarios:

@@ -50,7 +50,7 @@ export type MessageType = "marketing" | "transactional";
  * Message channel. Messages are SMS unless a request opts into another
  * channel.
  */
-export type MessageChannel = "sms" | "whatsapp";
+export type MessageChannel = "sms" | "whatsapp" | "rcs";
 
 /**
  * Request payload for sending an SMS message
@@ -59,7 +59,8 @@ export interface SendMessageRequest {
   /**
    * Message channel. Omit (or pass "sms") for SMS. To send on WhatsApp,
    * pass a {@link SendWhatsAppMessageRequest} (`channel: "whatsapp"`)
-   * instead — it has its own required fields and response shape.
+   * instead — it has its own required fields and response shape. To send
+   * on RCS, pass a {@link SendRcsMessageRequest} (`channel: "rcs"`).
    */
   channel?: "sms";
 
@@ -310,6 +311,352 @@ export interface WhatsAppMessage {
 }
 
 /**
+ * A suggestion chip on an RCS message — a tap-to-send reply.
+ */
+export interface RcsReplySuggestion {
+  reply: {
+    /**
+     * Chip label the recipient taps
+     */
+    text: string;
+
+    /**
+     * Payload delivered back to you when the chip is tapped
+     */
+    postbackData: string;
+  };
+}
+
+/**
+ * A suggestion chip on an RCS message — an open-URL action.
+ */
+export interface RcsActionSuggestion {
+  action: {
+    /**
+     * Chip label the recipient taps
+     */
+    text: string;
+
+    /**
+     * Payload delivered back to you when the chip is tapped
+     */
+    postbackData: string;
+
+    /**
+     * URL opened on the recipient's device when the chip is tapped
+     */
+    url: string;
+  };
+}
+
+/**
+ * A suggestion chip on an RCS message. Each entry is exactly one of a
+ * `reply` or an `action`.
+ */
+export type RcsSuggestion = RcsReplySuggestion | RcsActionSuggestion;
+
+/**
+ * Layout of an RCS rich card
+ */
+export type RcsCardOrientation = "vertical" | "horizontal";
+
+/**
+ * A rich card to send on RCS.
+ */
+export interface RcsCardParams {
+  /**
+   * Card title
+   */
+  title: string;
+
+  /**
+   * Card body text
+   */
+  description: string;
+
+  /**
+   * Card image — a publicly accessible JPEG, PNG, or GIF URL
+   */
+  mediaUrl?: string;
+
+  /**
+   * Card layout (default "vertical")
+   */
+  orientation?: RcsCardOrientation;
+
+  /**
+   * Buttons on the card
+   */
+  suggestions?: RcsSuggestion[];
+}
+
+/**
+ * Request payload for sending an RCS message.
+ *
+ * Provide exactly one of:
+ * - `text` — a text message, optionally with `suggestions` chips
+ * - `card` — a rich card (title, description, image, buttons)
+ *
+ * When the recipient's device or network doesn't support RCS, text
+ * messages automatically fall back to SMS (billed as SMS; suggestions are
+ * dropped) — the response says so via `channel: "sms"` and
+ * `fellBackTo: "sms"`. Rich cards have no SMS form and respond 422
+ * instead. Pass `fallbackToSms: false` to disable the fallback and get a
+ * 422 for non-RCS recipients.
+ *
+ * RCS sends require a live API key and an approved RCS agent on your
+ * workspace (see `sendly.rcs.agents`).
+ */
+export interface SendRcsMessageRequest {
+  /**
+   * Selects the RCS channel
+   */
+  channel: "rcs";
+
+  /**
+   * Destination phone number in E.164 format (e.g., +15551234567)
+   */
+  to: string;
+
+  /**
+   * The RCS agent to send as. Optional when your workspace has exactly
+   * one agent; required (as a disambiguator) when it has several.
+   */
+  agentId?: string;
+
+  /**
+   * Message text. Provide exactly one of `text` or `card`.
+   */
+  text?: string;
+
+  /**
+   * Rich card. Provide exactly one of `text` or `card`.
+   */
+  card?: RcsCardParams;
+
+  /**
+   * Suggestion chips for a `text` message. Card buttons go in
+   * `card.suggestions` instead. Dropped (and disclosed via
+   * `rcs.suggestionsDropped`) when the message falls back to SMS.
+   */
+  suggestions?: RcsSuggestion[];
+
+  /**
+   * Deliver as SMS when the recipient doesn't support RCS (default true).
+   * Set false to get a 422 `rcs_not_supported_for_recipient` instead.
+   */
+  fallbackToSms?: boolean;
+
+  /**
+   * Custom JSON metadata to attach to the message (max 4KB).
+   */
+  metadata?: Record<string, any>;
+}
+
+/**
+ * What kind of RCS message was sent
+ */
+export type RcsMessageKind = "text" | "card";
+
+/**
+ * RCS-specific details on a message that was delivered over RCS
+ */
+export interface RcsMessageDetails {
+  /**
+   * What was sent: a text message or a rich card
+   */
+  kind: RcsMessageKind;
+
+  /**
+   * The RCS agent the message was sent as
+   */
+  agentId: string;
+
+  /**
+   * The agent name recipients see
+   */
+  agentName: string;
+}
+
+/**
+ * RCS-specific details on a message that fell back to SMS
+ */
+export interface RcsFallbackDetails {
+  /**
+   * Always "rcs" — the channel the request asked for
+   */
+  requestedChannel: "rcs";
+
+  /**
+   * The RCS agent the send was attempted as
+   */
+  agentId: string;
+
+  /**
+   * Present (true) when the request carried suggestion chips — they have
+   * no SMS form and were dropped
+   */
+  suggestionsDropped?: boolean;
+}
+
+/**
+ * An RCS message that was delivered over RCS.
+ */
+export interface RcsSentMessage {
+  /**
+   * Unique message identifier
+   */
+  id: string;
+
+  /**
+   * "rcs" — the message went out over RCS
+   */
+  channel: "rcs";
+
+  /**
+   * Always "rcs"
+   */
+  message_format: "rcs";
+
+  /**
+   * Destination phone number
+   */
+  to: string;
+
+  /**
+   * The sending agent's name
+   */
+  from: string;
+
+  /**
+   * Body text for text sends; null for card sends
+   */
+  text: string | null;
+
+  /**
+   * Current delivery status
+   */
+  status: MessageStatus;
+
+  /**
+   * Always 1 — RCS has no segment concept
+   */
+  segments: number;
+
+  /**
+   * Credits charged for this message
+   */
+  creditsUsed: number;
+
+  /**
+   * RCS-specific details
+   */
+  rcs: RcsMessageDetails;
+
+  /**
+   * ISO 8601 timestamp when the message was created
+   */
+  createdAt: string;
+
+  /**
+   * Custom JSON metadata attached to the message
+   */
+  metadata?: Record<string, any>;
+}
+
+/**
+ * An RCS request that was delivered as SMS because the recipient's device
+ * or network doesn't support RCS. Billed as SMS.
+ */
+export interface RcsFallbackMessage {
+  /**
+   * Unique message identifier
+   */
+  id: string;
+
+  /**
+   * "sms" — the message fell back to SMS
+   */
+  channel: "sms";
+
+  /**
+   * Always "sms" on a fallback — the giveaway that the recipient didn't
+   * get an RCS message
+   */
+  fellBackTo: "sms";
+
+  /**
+   * Always "sms"
+   */
+  message_format: "sms";
+
+  /**
+   * Destination phone number
+   */
+  to: string;
+
+  /**
+   * The SMS sender used for the fallback (a number or sender ID)
+   */
+  from: string;
+
+  /**
+   * Body text
+   */
+  text: string;
+
+  /**
+   * Current delivery status
+   */
+  status: MessageStatus;
+
+  /**
+   * SMS segments billed
+   */
+  segments: number;
+
+  /**
+   * Credits charged for this message (SMS pricing)
+   */
+  creditsUsed: number;
+
+  /**
+   * What the request asked for, and what was dropped
+   */
+  rcs: RcsFallbackDetails;
+
+  /**
+   * ISO 8601 timestamp when the message was created
+   */
+  createdAt: string;
+
+  /**
+   * Custom JSON metadata attached to the message
+   */
+  metadata?: Record<string, any>;
+}
+
+/**
+ * The response to an RCS send. Check `channel` (or `fellBackTo`) to tell
+ * whether the message went out over RCS or fell back to SMS:
+ *
+ * ```typescript
+ * const message = await sendly.messages.send({
+ *   channel: 'rcs',
+ *   to: '+15551234567',
+ *   text: 'Your table is ready!',
+ * });
+ *
+ * if (message.channel === 'rcs') {
+ *   console.log(message.rcs.agentName);  // delivered over RCS
+ * } else {
+ *   console.log(message.fellBackTo);     // 'sms' — delivered as SMS
+ * }
+ * ```
+ */
+export type RcsMessage = RcsSentMessage | RcsFallbackMessage;
+
+/**
  * Request to send a group MMS to multiple recipients (US/Canada only).
  * Group messaging is an A2P 10DLC capability: the sending number must be an
  * MMS-enabled, 10DLC-registered number you own.
@@ -389,6 +736,8 @@ export type MessageStatus =
   | "queued"
   | "sent"
   | "delivered"
+  /** Read receipts exist on RCS and WhatsApp only — SMS never reports one */
+  | "read"
   | "failed"
   | "bounced"
   | "retrying";
@@ -1436,6 +1785,18 @@ export type SendlyErrorCode =
   | "whatsapp_template_not_approved"
   | "whatsapp_invalid_content"
   | "whatsapp_send_failed"
+  | "rcs_not_enabled"
+  | "rcs_requires_live_key"
+  | "rcs_agent_not_ready"
+  | "rcs_agent_ambiguous"
+  | "rcs_invalid_content"
+  | "rcs_not_supported_for_recipient"
+  | "rcs_send_failed"
+  | "rcs_capability_check_failed"
+  | "sms_fallback_unavailable"
+  | "sms_fallback_failed"
+  | "recipient_opted_out"
+  | "compliance_blocked"
   | "internal_error";
 
 /**
@@ -1630,6 +1991,7 @@ export const ALL_SUPPORTED_COUNTRIES: string[] =
 export type WebhookEventType =
   | "message.sent"
   | "message.delivered"
+  | "message.read"
   | "message.failed"
   | "message.bounced"
   | "message.retrying"

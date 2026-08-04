@@ -78,6 +78,8 @@ export type {
   WhatsAppSenderStatus,
   WhatsAppSender,
   WhatsAppSendersList,
+  WhatsAppSenderProfile,
+  UpdateWhatsAppSenderProfileRequest,
   WhatsAppTemplateCategory,
   WhatsAppTemplateStatus,
   WhatsAppTemplateButton,
@@ -89,6 +91,31 @@ export type {
   WhatsAppWindowOptions,
   WhatsAppWindow,
 } from "./resources/whatsapp";
+
+// Types - RCS (send)
+export type {
+  SendRcsMessageRequest,
+  RcsSuggestion,
+  RcsReplySuggestion,
+  RcsActionSuggestion,
+  RcsCardOrientation,
+  RcsCardParams,
+  RcsMessageKind,
+  RcsMessageDetails,
+  RcsFallbackDetails,
+  RcsSentMessage,
+  RcsFallbackMessage,
+  RcsMessage,
+} from "./types";
+
+// Types - RCS (agents, capability)
+export type {
+  RcsAgentStatus,
+  RcsAgent,
+  RcsAgentListResponse,
+  RcsCapabilityOptions,
+  RcsCapability,
+} from "./resources/rcs";
 
 // Types - Links (URL shortening)
 export type {
