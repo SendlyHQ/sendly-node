@@ -1,5 +1,17 @@
 # @sendly/node
 
+## 3.38.0
+
+### Minor Changes
+
+- [`8f49d1c`](https://github.com/SendlyHQ/sendly/commit/8f49d1c6f5fb33702ec208415ce61bb24749f82d) Thanks [@sendly-live](https://github.com/sendly-live)! - Automatic idempotency keys on POST requests. Every POST now carries a generated `Idempotency-Key` that is reused across the SDK's internal retry attempts, so on endpoints with idempotency support the server can recognize a retry of a request that already reached it and return the original result instead of executing it again, narrowing the duplicate-send and double-charge window that timeout retries used to open. It narrows that window rather than closing it: the server records a key only once the original request has finished, so a retry that fires while the first request is still executing is not recognized as a repeat and can still go through. Keys rotate after a 5xx response (the outcome is known, so the retry re-executes) and are preserved across timeouts and network errors (the outcome is unknown, so the server dedupes). Exception: `messages.sendBatch` sends no automatic key, because the batch endpoint already dedupes header-less retries server-side by request content and an automatic key would bypass that protection.
+
+  `messages.send`, `messages.sendGroup`, `messages.sendBatch`, and `messages.schedule` accept an optional `{ idempotencyKey }` second argument for callers who need idempotency across process restarts or their own retry loops. Repeating a request with the same key within 24 hours returns the original response instead of executing again. Keys are validated client-side (1-255 printable ASCII); empty values are ignored.
+
+  Fixes four account methods that requested paths the API does not serve, so they could never have worked. `account.listApiKeys`, `account.getApiKey` and `account.getApiKeyUsage` asked for `/keys...`, which has no route at all; they now use `/account/keys...`. `account.revokeApiKey` issued a `DELETE` against a path registered only for `GET`; revocation is now `PATCH /account/keys/{id}/revoke`. `listApiKeys` also unwraps the response envelope, so it returns the `ApiKey[]` its signature promises rather than a raw object, and `getApiKeyUsage` returns the fields the endpoint actually sends (`keyId`, `keyName`, `summary`, `recentRequests`, `endpointBreakdown`) instead of a set that never existed.
+
+  Also: the `User-Agent` header now reports the actual package version, a legacy internal reference field on `Message` is deprecated (use `id` to track messages — see the `@deprecated` marker in the type), and the `direction` and `isSandbox` fields are documented as not populated by every endpoint. No runtime breaking changes; all existing method signatures remain callable as before. Type-level notes: `Parameters<>` tuples of the four send/schedule methods gain an optional second element, and the `ApiKeyUsage` return type changed to match the wire — code reading the old fields was reading `undefined`.
+
 ## 3.37.0
 
 ### Minor Changes
