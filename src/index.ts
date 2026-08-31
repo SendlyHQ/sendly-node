@@ -55,6 +55,7 @@ export type {
   SendlyErrorCode,
   RateLimitInfo,
   PricingTier,
+  IdempotentRequestOptions,
 } from "./types";
 
 // Types - WhatsApp (send)
@@ -151,6 +152,7 @@ export type {
   Credits,
   CreditTransaction,
   ApiKey,
+  ApiKeyUsage,
   RotatedApiKey,
   RotateApiKeyResponse,
 } from "./types";

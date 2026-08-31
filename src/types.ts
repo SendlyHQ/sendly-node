@@ -778,6 +778,10 @@ export interface Message {
 
   /**
    * Message direction
+   *
+   * Note: not populated by every endpoint today — treat as possibly
+   * undefined at runtime. Messages sent through the SDK are always
+   * outbound.
    */
   direction: "outbound" | "inbound";
 
@@ -808,6 +812,9 @@ export interface Message {
 
   /**
    * Whether this message was sent in sandbox mode
+   *
+   * Note: not populated by every endpoint today — treat as possibly
+   * undefined at runtime.
    */
   isSandbox: boolean;
 
@@ -820,7 +827,8 @@ export interface Message {
   senderType?: SenderType;
 
   /**
-   * Carrier message ID for tracking
+   * @deprecated Internal carrier reference — will be removed from the
+   * public type in a future release. Use `id` to track messages.
    */
   telnyxMessageId?: string | null;
 
@@ -1873,6 +1881,54 @@ export interface RequestOptions {
    * such as branded short-link management.
    */
   unversioned?: boolean;
+
+  /**
+   * Idempotency key for this request (1-255 printable ASCII characters).
+   * When omitted, POST requests are automatically assigned a unique key
+   * that is reused across retry attempts, so on endpoints with idempotency
+   * support (all message-sending endpoints) the server can recognize a
+   * retry of a request that already reached it and return the original
+   * result instead of executing again. Supply your own key to extend that
+   * protection across process restarts.
+   */
+  idempotencyKey?: string;
+
+  /**
+   * Set to false to skip auto-generating an idempotency key for a POST.
+   * Used for the batch endpoint, where the server dedupes header-less
+   * retries by request content and an auto key would bypass that net.
+   * A caller-supplied idempotencyKey is always sent regardless.
+   */
+  autoIdempotencyKey?: boolean;
+}
+
+/**
+ * Per-call options accepted by mutating resource methods.
+ */
+export interface IdempotentRequestOptions {
+  /**
+   * Idempotency key for this operation (1-255 printable ASCII characters).
+   *
+   * The SDK already generates a key per logical request automatically, so
+   * the server can dedupe the SDK's own timeout retries. Supply your own
+   * key when you need idempotency across process restarts or your own
+   * retry loops — repeating a request with the same key within 24 hours
+   * returns the original response instead of executing again.
+   *
+   * Note: a response is cached under the key once the original attempt
+   * completes, including error responses — retrying a failed request with
+   * the same key returns the recorded failure; use a fresh key to
+   * re-execute.
+   *
+   * @example
+   * ```typescript
+   * await sendly.messages.send(
+   *   { to: '+15551234567', text: 'Your order shipped!' },
+   *   { idempotencyKey: `order-4821-shipped` }
+   * );
+   * ```
+   */
+  idempotencyKey?: string;
 }
 
 /**
@@ -2403,6 +2459,35 @@ export interface ApiKey {
   expiresAt?: string | null;
   /** Whether key is revoked */
   isRevoked: boolean;
+}
+
+/**
+ * Usage statistics for a single API key (see {@link AccountResource.getApiKeyUsage}).
+ */
+export interface ApiKeyUsage {
+  /** Key ID the statistics belong to */
+  keyId: string;
+  /** Key name/label */
+  keyName: string;
+  /** Rolled-up totals across the recorded requests */
+  summary: {
+    /** Number of recorded requests */
+    totalRequests: number;
+    /** Credits consumed by those requests */
+    totalCredits: number;
+    /** When the key was last used (ISO 8601), or null if never */
+    lastUsed: string | null;
+  };
+  /** Most recent requests, newest first */
+  recentRequests: Array<{
+    endpoint: string;
+    method: string;
+    statusCode: number;
+    creditsUsed: number;
+    createdAt: string;
+  }>;
+  /** Request counts per endpoint, busiest first */
+  endpointBreakdown: Array<{ endpoint: string; count: number }>;
 }
 
 /**

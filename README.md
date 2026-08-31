@@ -251,6 +251,32 @@ const sendly = new Sendly({
 });
 ```
 
+## Idempotency
+
+POSTs carry an automatically generated `Idempotency-Key`, reused across the
+SDK's own timeout and network-error retries, so a retry of a request that
+already reached the API returns the original result instead of sending and
+charging again. After a `5xx` the generated key is rotated so the retry really
+does run again. You do not have to do anything to get this.
+
+Pass your own key when the guarantee needs to outlive the process — a job queue
+that re-runs after a crash, or your own retry loop:
+
+```typescript
+await sendly.messages.send(
+  { to: '+15551234567', text: 'Your order has shipped!' },
+  { idempotencyKey: `order-4821-shipped` }
+);
+```
+
+Reusing a key within 24 hours returns the original response. Reusing it with a
+different body returns `422 idempotency_key_mismatch`, so derive keys from
+something stable in your domain, like an order id. `sendBatch` sends no
+automatic key, because the API already deduplicates identical batches by their
+contents.
+
+Full details: https://sendly.live/docs/idempotency
+
 ## Webhooks
 
 Manage webhook endpoints to receive real-time delivery status updates.
@@ -355,8 +381,8 @@ for (const key of keys) {
 
 // Get API key usage stats
 const usage = await sendly.account.getApiKeyUsage('key_xxx');
-console.log(`Messages sent: ${usage.messagesSent}`);
-console.log(`Credits used: ${usage.creditsUsed}`);
+console.log(`Requests: ${usage.summary.totalRequests}`);
+console.log(`Credits used: ${usage.summary.totalCredits}`);
 
 // Create a new API key
 const { apiKey, key } = await sendly.account.createApiKey('Production Key');

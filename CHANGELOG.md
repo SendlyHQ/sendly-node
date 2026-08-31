@@ -105,7 +105,7 @@
 
 - `/api/v1/enterprise/workspaces/:id/verification/submit` now returns specific missing-field errors (e.g. `"Missing required fields: website"`) instead of listing every required field whether present or not.
 - Endpoint accepts both flat and `{ verification: {...} }` wrapped shapes (matches `/enterprise/provision`).
-- `useCase` validation expanded from 23 entries to the full 43-value Telnyx enum.
+- `useCase` validation expanded from 23 entries to the full 43-value carrier use-case enum.
 
 ## 3.29.0
 

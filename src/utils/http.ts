@@ -3,13 +3,16 @@
  * @packageDocumentation
  */
 
+import { randomUUID } from "node:crypto";
 import type { RequestOptions, RateLimitInfo, ApiErrorResponse } from "../types";
 import {
   SendlyError,
   NetworkError,
   TimeoutError,
   RateLimitError,
+  ValidationError,
 } from "../errors";
+import { version as SDK_VERSION } from "../../package.json";
 
 const DEFAULT_BASE_URL = "https://sendly.live/api/v1";
 const DEFAULT_TIMEOUT = 30000;
@@ -87,11 +90,22 @@ export class HttpClient {
    */
   async request<T>(options: RequestOptions): Promise<T> {
     const url = this.buildUrl(options.path, options.query, options.unversioned);
-    const headers = this.buildHeaders(options.headers);
+
+    const explicitKey = this.normalizeIdempotencyKey(options.idempotencyKey);
+    let idempotencyKey =
+      explicitKey ??
+      (options.method === "POST" && options.autoIdempotencyKey !== false
+        ? this.generateIdempotencyKey()
+        : undefined);
 
     let lastError: Error | undefined;
 
     for (let attempt = 0; attempt <= this.config.maxRetries; attempt++) {
+      const headers = this.buildHeaders({
+        ...options.headers,
+        ...(idempotencyKey && { "Idempotency-Key": idempotencyKey }),
+      });
+
       try {
         const response = await this.executeRequest(url, {
           method: options.method,
@@ -134,6 +148,19 @@ export class HttpClient {
 
         // Retry on network errors and 5xx errors
         if (attempt < this.config.maxRetries) {
+          // A 5xx means the server responded (and may have cached that
+          // response under the key), so an auto-generated key is rotated to
+          // let the retry re-execute. Timeouts and network errors leave the
+          // outcome unknown — the key is kept so the server can dedupe a
+          // request that actually went through. Caller-supplied keys are
+          // never rotated.
+          if (
+            !explicitKey &&
+            idempotencyKey &&
+            this.isServerErrorResponse(error)
+          ) {
+            idempotencyKey = this.generateIdempotencyKey();
+          }
           const backoffTime = this.calculateBackoff(attempt);
           await this.sleep(backoffTime);
           continue;
@@ -153,14 +180,21 @@ export class HttpClient {
     headers: Record<string, string> = {},
   ): Promise<T> {
     const url = this.buildUrl(path);
-    const baseHeaders = this.buildHeaders();
-    delete baseHeaders["Content-Type"];
 
-    const mergedHeaders = { ...baseHeaders, ...headers };
+    const callerKey = this.normalizeIdempotencyKey(headers["Idempotency-Key"]);
+    let idempotencyKey = callerKey ?? this.generateIdempotencyKey();
 
     let lastError: Error | undefined;
 
     for (let attempt = 0; attempt <= this.config.maxRetries; attempt++) {
+      const baseHeaders = this.buildHeaders();
+      delete baseHeaders["Content-Type"];
+      const mergedHeaders = {
+        ...baseHeaders,
+        ...headers,
+        "Idempotency-Key": idempotencyKey,
+      };
+
       try {
         const response = await this.executeRequest(url, {
           method: "POST",
@@ -190,6 +224,9 @@ export class HttpClient {
         }
 
         if (attempt < this.config.maxRetries) {
+          if (!callerKey && this.isServerErrorResponse(error)) {
+            idempotencyKey = this.generateIdempotencyKey();
+          }
           const backoffTime = this.calculateBackoff(attempt);
           await this.sleep(backoffTime);
           continue;
@@ -198,6 +235,46 @@ export class HttpClient {
     }
 
     throw lastError || new NetworkError("Request failed after retries");
+  }
+
+  /**
+   * Generate an idempotency key for a logical request. Reused across retry
+   * attempts so the server can recognize a retry of a timed-out POST that
+   * actually reached it.
+   */
+  private generateIdempotencyKey(): string {
+    return `sendly-node-retry-${randomUUID()}`;
+  }
+
+  /**
+   * Validate and normalize a caller-supplied idempotency key. Empty and
+   * whitespace-only values are treated as absent (auto-generation still
+   * applies); invalid values fail fast instead of surfacing later as a
+   * retried network error.
+   */
+  private normalizeIdempotencyKey(key: string | undefined): string | undefined {
+    if (key === undefined) return undefined;
+    const trimmed = key.trim();
+    if (!trimmed) return undefined;
+    if (trimmed.length > 255 || !/^[\x20-\x7E]+$/.test(trimmed)) {
+      throw new ValidationError(
+        "Idempotency key must be 1-255 printable ASCII characters",
+      );
+    }
+    return trimmed;
+  }
+
+  /**
+   * True when the error carries an actual 5xx response from the server,
+   * as opposed to a timeout or network failure where the outcome of the
+   * request is unknown. TimeoutError and NetworkError carry no statusCode.
+   */
+  private isServerErrorResponse(error: unknown): boolean {
+    return (
+      error instanceof SendlyError &&
+      typeof error.statusCode === "number" &&
+      error.statusCode >= 500
+    );
   }
 
   /**
@@ -299,7 +376,7 @@ export class HttpClient {
       Authorization: `Bearer ${this.config.apiKey}`,
       "Content-Type": "application/json",
       Accept: "application/json",
-      "User-Agent": "@sendly/node/3.37.1",
+      "User-Agent": `@sendly/node/${SDK_VERSION}`,
       ...additionalHeaders,
     };
 

@@ -9,6 +9,7 @@ import type {
   Credits,
   CreditTransaction,
   ApiKey,
+  ApiKeyUsage,
   RotateApiKeyResponse,
 } from "../types";
 
@@ -148,12 +149,12 @@ export class AccountResource {
    * ```
    */
   async listApiKeys(): Promise<ApiKey[]> {
-    const keys = await this.http.request<ApiKey[]>({
+    const response = await this.http.request<{ keys: ApiKey[] }>({
       method: "GET",
-      path: "/keys",
+      path: "/account/keys",
     });
 
-    return keys;
+    return response.keys;
   }
 
   /**
@@ -171,7 +172,7 @@ export class AccountResource {
   async getApiKey(id: string): Promise<ApiKey> {
     const key = await this.http.request<ApiKey>({
       method: "GET",
-      path: `/keys/${encodeURIComponent(id)}`,
+      path: `/account/keys/${encodeURIComponent(id)}`,
     });
 
     return key;
@@ -186,29 +187,13 @@ export class AccountResource {
    * @example
    * ```typescript
    * const usage = await sendly.account.getApiKeyUsage('key_xxx');
-   * console.log(`Messages sent: ${usage.messagesSent}`);
+   * console.log(`Requests: ${usage.summary.totalRequests}`);
    * ```
    */
-  async getApiKeyUsage(id: string): Promise<{
-    keyId: string;
-    messagesSent: number;
-    messagesDelivered: number;
-    messagesFailed: number;
-    creditsUsed: number;
-    periodStart: string;
-    periodEnd: string;
-  }> {
-    const usage = await this.http.request<{
-      keyId: string;
-      messagesSent: number;
-      messagesDelivered: number;
-      messagesFailed: number;
-      creditsUsed: number;
-      periodStart: string;
-      periodEnd: string;
-    }>({
+  async getApiKeyUsage(id: string): Promise<ApiKeyUsage> {
+    const usage = await this.http.request<ApiKeyUsage>({
       method: "GET",
-      path: `/keys/${encodeURIComponent(id)}/usage`,
+      path: `/account/keys/${encodeURIComponent(id)}/usage`,
     });
 
     return usage;
@@ -265,8 +250,8 @@ export class AccountResource {
     }
 
     await this.http.request<void>({
-      method: "DELETE",
-      path: `/account/keys/${encodeURIComponent(id)}`,
+      method: "PATCH",
+      path: `/account/keys/${encodeURIComponent(id)}/revoke`,
     });
   }
 

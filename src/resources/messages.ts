@@ -27,6 +27,7 @@ import type {
   BatchPreviewResponse,
   ListBatchesOptions,
   BatchListResponse,
+  IdempotentRequestOptions,
 } from "../types";
 import {
   validatePhoneNumber,
@@ -104,7 +105,10 @@ export class MessagesResource {
    * @throws {AuthenticationError} If the API key is invalid
    * @throws {RateLimitError} If rate limit is exceeded
    */
-  async send(request: SendWhatsAppMessageRequest): Promise<WhatsAppMessage>;
+  async send(
+    request: SendWhatsAppMessageRequest,
+    options?: IdempotentRequestOptions,
+  ): Promise<WhatsAppMessage>;
 
   /**
    * Send an RCS message
@@ -159,7 +163,10 @@ export class MessagesResource {
    * @throws {AuthenticationError} If the API key is invalid
    * @throws {RateLimitError} If rate limit is exceeded
    */
-  async send(request: SendRcsMessageRequest): Promise<RcsMessage>;
+  async send(
+    request: SendRcsMessageRequest,
+    options?: IdempotentRequestOptions,
+  ): Promise<RcsMessage>;
 
   /**
    * Send an SMS message
@@ -184,13 +191,17 @@ export class MessagesResource {
    * @throws {AuthenticationError} If the API key is invalid
    * @throws {RateLimitError} If rate limit is exceeded
    */
-  async send(request: SendMessageRequest): Promise<Message>;
+  async send(
+    request: SendMessageRequest,
+    options?: IdempotentRequestOptions,
+  ): Promise<Message>;
 
   async send(
     request:
       | SendMessageRequest
       | SendWhatsAppMessageRequest
       | SendRcsMessageRequest,
+    options?: IdempotentRequestOptions,
   ): Promise<Message | WhatsAppMessage | RcsMessage> {
     // Validate request
     validatePhoneNumber(request.to);
@@ -205,6 +216,7 @@ export class MessagesResource {
       const message = await this.http.request<RcsMessage>({
         method: "POST",
         path: "/messages",
+        idempotencyKey: options?.idempotencyKey,
         body: {
           channel: "rcs",
           to: request.to,
@@ -233,6 +245,7 @@ export class MessagesResource {
       const message = await this.http.request<WhatsAppMessage>({
         method: "POST",
         path: "/messages",
+        idempotencyKey: options?.idempotencyKey,
         body: {
           channel: "whatsapp",
           to: request.to,
@@ -256,6 +269,7 @@ export class MessagesResource {
     const message = await this.http.request<Message>({
       method: "POST",
       path: "/messages",
+      idempotencyKey: options?.idempotencyKey,
       body: {
         to: request.to,
         text: request.text,
@@ -297,6 +311,7 @@ export class MessagesResource {
    */
   async sendGroup(
     request: SendGroupMessageRequest,
+    options?: IdempotentRequestOptions,
   ): Promise<GroupMessageResponse> {
     if (!Array.isArray(request.to) || request.to.length < 2) {
       throw new Error("Group messaging requires at least 2 recipients in 'to'");
@@ -319,6 +334,7 @@ export class MessagesResource {
     const response = await this.http.request<GroupMessageResponse>({
       method: "POST",
       path: "/messages/group",
+      idempotencyKey: options?.idempotencyKey,
       body: {
         to: request.to,
         ...(request.text && { text: request.text }),
@@ -529,7 +545,10 @@ export class MessagesResource {
    * @throws {InsufficientCreditsError} If credit balance is too low
    * @throws {AuthenticationError} If the API key is invalid
    */
-  async schedule(request: ScheduleMessageRequest): Promise<ScheduledMessage> {
+  async schedule(
+    request: ScheduleMessageRequest,
+    options?: IdempotentRequestOptions,
+  ): Promise<ScheduledMessage> {
     // Validate request
     validatePhoneNumber(request.to);
     validateMessageText(request.text);
@@ -558,6 +577,7 @@ export class MessagesResource {
     const scheduled = await this.http.request<ScheduledMessage>({
       method: "POST",
       path: "/messages/schedule",
+      idempotencyKey: options?.idempotencyKey,
       body: {
         to: request.to,
         text: request.text,
@@ -682,7 +702,10 @@ export class MessagesResource {
    * @throws {ValidationError} If any message is invalid
    * @throws {InsufficientCreditsError} If credit balance is too low
    */
-  async sendBatch(request: BatchMessageRequest): Promise<BatchMessageResponse> {
+  async sendBatch(
+    request: BatchMessageRequest,
+    options?: IdempotentRequestOptions,
+  ): Promise<BatchMessageResponse> {
     // Validate all messages
     if (
       !request.messages ||
@@ -705,9 +728,14 @@ export class MessagesResource {
       validateSenderId(request.from);
     }
 
+    // The batch endpoint dedupes header-less retries server-side by hashing
+    // the request content; an auto-generated key would bypass that net for
+    // identical cross-process re-runs, so only caller-supplied keys are sent.
     const batch = await this.http.request<BatchMessageResponse>({
       method: "POST",
       path: "/messages/batch",
+      idempotencyKey: options?.idempotencyKey,
+      autoIdempotencyKey: false,
       body: {
         messages: request.messages,
         ...(request.from && { from: request.from }),
