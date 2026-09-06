@@ -1,5 +1,12 @@
 # @sendly/node
 
+## Unreleased
+
+### Minor Changes
+
+- **`SendlyErrorCode` gained nine members**: `rcs_not_found`, `rcs_field_locked`, `rcs_us_only`, `rcs_brand_not_verified`, `rcs_launch_not_ready`, `rcs_internal_error`, `forbidden`, `invalid_idempotency_key` and `idempotency_key_mismatch`. Nothing was removed or renamed, and there is no runtime change. If you have an exhaustive `switch` over `SendlyErrorCode` or a `Record<SendlyErrorCode, ...>`, add the new members or a default branch. The last three are not RCS-specific: the API could already return them on any endpoint, so this is a type-correctness fix as much as an addition.
+
+
 ## 3.38.0
 
 ### Minor Changes
