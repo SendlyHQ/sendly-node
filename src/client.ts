@@ -383,17 +383,37 @@ export class Sendly {
   public readonly whatsapp: WhatsAppResource;
 
   /**
-   * RCS API resource — discover agents and pre-flight recipient
-   * capability.
+   * RCS API resource — register your brand and agent, discover agents,
+   * and pre-flight recipient capability.
    *
    * Sending as your brand requires an RCS agent (the verified sender
-   * identity recipients see), registered per workspace through carrier
-   * review — contact support to register one. Sends go through
-   * `messages.send` with `channel: 'rcs'`; text messages fall back to
-   * SMS automatically when the recipient doesn't support RCS.
+   * identity recipients see). Registration is self-serve from the
+   * dashboard or this API: draft a brand and an agent, submit for
+   * review (Sendly first, then the carrier network), test on invited
+   * devices, then request launch. Logo, hero, and call-to-action media
+   * must be public https:// URLs; uploading assets is dashboard-only.
+   * Sends go through `messages.send` with `channel: 'rcs'`; text
+   * messages fall back to SMS automatically when the recipient doesn't
+   * support RCS.
    *
    * @example
    * ```typescript
+   * // Register: brand -> agent -> submit for review
+   * const { brand } = await sendly.rcs.brands.create({
+   *   displayName: 'Acme Coffee',
+   *   legalName: 'Acme Coffee LLC',
+   *   ein: '12-3456789',
+   *   address: { line1: '100 Main St', city: 'Chicago', state: 'IL',
+   *     postalCode: '60601', countryCode: 'US' },
+   * });
+   * const { agent } = await sendly.rcs.agents.create({
+   *   brandId: brand.id,
+   *   displayName: 'Acme Coffee',
+   *   useCase: 'MULTI_USE',
+   *   basics: { logoUrl: 'https://acme.example/rcs/logo.png' },
+   * });
+   * await sendly.rcs.agents.submit(agent.id);
+   *
    * // Find your sendable agent
    * const { agents } = await sendly.rcs.agents.list();
    *

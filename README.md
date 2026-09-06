@@ -595,11 +595,95 @@ await sendly.whatsapp.senders.updateProfile('+15559876543', {
 
 Send branded, verified-sender messages on Android: rich cards, suggestion
 chips, and read receipts. Sending as your brand requires an RCS agent (the
-verified identity recipients see), registered per workspace through carrier
-review - contact support to register one. Text messages automatically fall
-back to SMS when the recipient's device or network doesn't support RCS
-(billed as SMS; suggestion chips are dropped); rich cards have no SMS form
-and respond 422 instead. Requires a live API key.
+verified identity recipients see). Registration is self-serve, from the
+dashboard or the API: draft a brand and an agent, submit them for review
+(Sendly reviews first, then the carrier network), test on invited devices,
+then request launch. Text messages automatically fall back to SMS when the
+recipient's device or network doesn't support RCS (billed as SMS; suggestion
+chips are dropped); rich cards have no SMS form and respond 422 instead.
+Sending requires a live API key.
+
+### Registering an agent
+
+Reads need the `rcs:read` scope and writes `rcs:write`. Every brand and
+agent field is optional while drafting; required-field checks run at
+`submit`, which lists each gap in `error.response.errors`. Logo, hero, and
+call-to-action media must be public `https://` URLs - uploading assets is
+dashboard-only. RCS registration is available to US businesses for now.
+
+```typescript
+// 1. Draft a brand - prefill it from business details already on file
+const dossier = await sendly.rcs.dossier.get();
+const { brand } = await sendly.rcs.brands.create({
+  ...dossier.brand,
+  displayName: 'Acme Coffee',
+  legalName: 'Acme Coffee LLC',
+  legalEntityType: 'LIMITED_LIABILITY_COMPANY',
+  organizationType: 'PRIVATE_PROFIT',
+  websiteUrl: 'https://acme.example',
+  ein: '12-3456789',
+  address: { line1: '100 Main St', city: 'Chicago', state: 'IL', postalCode: '60601', countryCode: 'US' },
+  contact: { firstName: 'Sam', lastName: 'Lee', email: 'sam@acme.example', phoneNumber: '+13125550100' },
+});
+
+// 2. Draft the agent recipients will see
+const { agent } = await sendly.rcs.agents.create({
+  brandId: brand.id,
+  displayName: 'Acme Coffee',
+  useCase: 'MULTI_USE',
+  basics: {
+    description: 'Order updates and support for Acme Coffee customers',
+    logoUrl: 'https://acme.example/rcs/logo.png', // public https URL
+    heroUrl: 'https://acme.example/rcs/hero.png',
+    brandColor: '#0B6E4F',
+    privacyPolicyUrl: 'https://acme.example/privacy',
+    termsAndConditionsUrl: 'https://acme.example/terms',
+  },
+});
+
+// 3. Submit for review - an idempotency key means a retry never re-notifies reviewers
+const { stage } = await sendly.rcs.agents.submit(agent.id, {
+  idempotencyKey: `rcs-submit-${agent.id}`,
+});
+console.log(stage); // "in_review"
+
+// Poll for progress: in_review -> brand_verification -> agent_review -> testing -> ...
+const { agent: current } = await sendly.rcs.agents.get(agent.id);
+console.log(current.customerStage, current.reviewNote);
+
+// 4. Once the stage is 'testing': invite your devices and fill in the campaign
+await sendly.rcs.agents.setTestDevices(agent.id, [
+  { phoneNumber: '+13125550100', label: "Sam's Pixel" },
+]);
+await sendly.rcs.agents.update(agent.id, {
+  campaign: {
+    agentOverview: 'Order confirmations, pickup alerts, and support replies',
+    interactions: [{ interactionType: 'TRANSACTIONAL_UPDATES', description: 'Order status' }],
+    messageExamples: [
+      'Your order #4821 is being roasted.',
+      'Your order #4821 is ready for pickup!',
+      'Thanks for visiting - reply HELP for support.',
+    ],
+    consentSettings: {
+      optInMethods: [{ methodType: 'WEBSITE', description: 'Checkout checkbox' }],
+      callToAction: 'Text me order updates',
+      callToActionUrl: 'https://acme.example/checkout',
+      optInMessage: 'Welcome to Acme Coffee updates. Reply STOP to opt out.',
+      helpResponse: 'Acme Coffee: email help@acme.example for support.',
+      optOutResponse: 'You have been unsubscribed from Acme Coffee updates.',
+    },
+  },
+});
+
+// 5. Request launch - the agent can reach everyone once the stage is 'live'
+await sendly.rcs.agents.requestLaunch(agent.id, { testUrl: 'https://acme.example/rcs-test' });
+
+// Everything at a glance
+const registration = await sendly.rcs.registration.get();
+console.log(registration.stage, registration.agent?.displayName);
+```
+
+### Sending
 
 ```typescript
 // Your registered agents ('testing' or 'approved' agents are sendable)

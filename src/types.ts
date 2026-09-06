@@ -1801,11 +1801,35 @@ export type SendlyErrorCode =
   | "rcs_not_supported_for_recipient"
   | "rcs_send_failed"
   | "rcs_capability_check_failed"
+  | "rcs_not_found"
+  | "rcs_field_locked"
+  | "rcs_us_only"
+  | "rcs_brand_not_verified"
+  | "rcs_launch_not_ready"
+  | "rcs_internal_error"
+  | "forbidden"
+  | "invalid_idempotency_key"
+  | "idempotency_key_mismatch"
   | "sms_fallback_unavailable"
   | "sms_fallback_failed"
   | "recipient_opted_out"
   | "compliance_blocked"
   | "internal_error";
+
+/**
+ * One field-level problem reported alongside a validation error
+ */
+export interface ApiFieldError {
+  /**
+   * Dot path of the field, e.g. "brand.ein" or "devices.0.phoneNumber"
+   */
+  path: string;
+
+  /**
+   * What is wrong with it
+   */
+  message: string;
+}
 
 /**
  * Error response from the Sendly API
@@ -1835,6 +1859,11 @@ export interface ApiErrorResponse {
    * Seconds to wait before retrying (for rate_limit_exceeded errors)
    */
   retryAfter?: number;
+
+  /**
+   * Field-level detail (for validation errors such as rcs_invalid_content)
+   */
+  errors?: ApiFieldError[];
 
   /**
    * Additional error context
