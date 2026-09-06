@@ -1,11 +1,16 @@
 # @sendly/node
 
+## 3.39.0
+
+### Minor Changes
+
+- [#64](https://github.com/SendlyHQ/sendly/pull/64) [`31df97f`](https://github.com/SendlyHQ/sendly/commit/31df97f78416800cff492b7543549673cd1ee829) Thanks [@sendly-live](https://github.com/sendly-live)! - Added self-serve RCS registration: `rcs.registration.get`, `rcs.dossier.get`, `rcs.brands.create/update`, and `rcs.agents.create/get/update/setTestDevices/submit/requestLaunch` in the Node SDK (with the matching types, `ApiErrorResponse.errors`, and new `rcs_*` error codes), plus the ten `rcs_*` registration tools in the MCP server.
+
 ## Unreleased
 
 ### Minor Changes
 
 - **`SendlyErrorCode` gained nine members**: `rcs_not_found`, `rcs_field_locked`, `rcs_us_only`, `rcs_brand_not_verified`, `rcs_launch_not_ready`, `rcs_internal_error`, `forbidden`, `invalid_idempotency_key` and `idempotency_key_mismatch`. Nothing was removed or renamed, and there is no runtime change. If you have an exhaustive `switch` over `SendlyErrorCode` or a `Record<SendlyErrorCode, ...>`, add the new members or a default branch. The last three are not RCS-specific: the API could already return them on any endpoint, so this is a type-correctness fix as much as an addition.
-
 
 ## 3.38.0
 
