@@ -316,10 +316,29 @@ export class HttpClient {
     const contentType = response.headers.get("content-type");
     let data: unknown;
 
-    if (contentType?.includes("application/json")) {
+    const isJson = contentType?.includes("application/json") ?? false;
+
+    if (isJson) {
       data = await response.json();
     } else {
       data = await response.text();
+    }
+
+    // A non-JSON body never comes from the API. It means the request reached
+    // something else: a wrong baseUrl (the origin instead of the /api/v1 path),
+    // a proxy, or a security product returning its own page. Say so, because
+    // the alternative is returning the HTML as if it were the typed result.
+    if (!isJson) {
+      const body = typeof data === "string" ? data.trim() : "";
+      const snippet = body.slice(0, 200).replace(/\s+/g, " ");
+      throw new SendlyError(
+        `Expected JSON from the Sendly API but received ${contentType || "an unknown content type"} ` +
+          `(HTTP ${response.status}). Check that baseUrl points at the API ` +
+          `(https://sendly.live/api/v1) and that no proxy is intercepting the request.` +
+          (snippet ? ` Response began: ${snippet}` : ""),
+        "invalid_response",
+        response.status,
+      );
     }
 
     // Handle error responses

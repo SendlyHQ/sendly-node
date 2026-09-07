@@ -1814,7 +1814,9 @@ export type SendlyErrorCode =
   | "sms_fallback_failed"
   | "recipient_opted_out"
   | "compliance_blocked"
-  | "internal_error";
+  | "internal_error"
+  /** The response did not come from the Sendly API (wrong baseUrl, or a proxy intercepted it) */
+  | "invalid_response";
 
 /**
  * One field-level problem reported alongside a validation error
@@ -2080,7 +2082,6 @@ export type WebhookEventType =
   | "message.failed"
   | "message.bounced"
   | "message.retrying"
-  | "message.queued"
   | "message.received"
   | "message.opt_out"
   | "message.opt_in"
@@ -2091,6 +2092,11 @@ export type WebhookEventType =
   | "verification.failed"
   | "verification.resent"
   | "verification.delivery_failed"
+  | "conversation.created"
+  | "conversation.updated"
+  | "draft.created"
+  | "draft.approved"
+  | "draft.rejected"
   | "contact.auto_flagged"
   | "contact.marked_valid"
   | "contacts.lookup_completed"
@@ -2102,6 +2108,12 @@ export type WebhookEventType =
   | "campaign.suspended"
   | "assignment.confirmed"
   | "assignment.failed"
+  | "rcs_brand.verified"
+  | "rcs_brand.failed"
+  | "rcs_agent.testing"
+  | "rcs_agent.live"
+  | "rcs_agent.rejected"
+  | "rcs_agent.action_required"
   | "port.completed"
   | "port_out.requested"
   | "port_out.completed"
@@ -2110,7 +2122,15 @@ export type WebhookEventType =
   | "number.activated"
   | "number.failed"
   | "number.requirements_required"
-  | "number.released";
+  | "number.released"
+  | "whatsapp_account.connected"
+  | "whatsapp_account.failed"
+  | "whatsapp_template.approved"
+  | "whatsapp_template.rejected"
+  | "whatsapp_template.paused"
+  | "call.started"
+  | "call.completed"
+  | "call.recording.ready";
 
 /**
  * Source of a list-health event. Frozen enum — new values will be
@@ -2172,7 +2192,7 @@ export interface WebhookEvent {
   /** Unique event identifier (evt_xxx) */
   id: string;
   /** Event type */
-  type: WebhookEventType | string;
+  type: WebhookEventType | (string & {});
   /** Event data */
   data: WebhookEventData;
   /** When event was created (ISO 8601) */

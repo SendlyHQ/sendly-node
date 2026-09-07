@@ -164,4 +164,32 @@ describe("Sendly Client", () => {
       expect(client.messages.get).toBeInstanceOf(Function);
     });
   });
+
+  describe("non-JSON responses", () => {
+    it("throws a diagnosable error instead of returning an HTML page as the result", async () => {
+      const client = new Sendly("sk_test_v1_valid_key");
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Headers({ "Content-Type": "text/html; charset=utf-8" }),
+        text: async () => "<!DOCTYPE html><html><body>Sendly</body></html>",
+      });
+
+      await expect(client.account.get()).rejects.toThrow(/Expected JSON from the Sendly API/);
+    });
+
+    it("surfaces an intercepted error page rather than a bare HTTP code", async () => {
+      const client = new Sendly("sk_test_v1_valid_key");
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        headers: new Headers({ "Content-Type": "text/html" }),
+        text: async () => "<html><title>Access denied | Error code 1010</title></html>",
+      });
+
+      await expect(client.account.get()).rejects.toThrow(/1010/);
+    });
+  });
 });
