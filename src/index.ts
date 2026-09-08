@@ -410,6 +410,7 @@ export {
   WebhookSignatureError,
   verifyWebhookSignature,
   parseWebhookEvent,
+  webhookObject,
   generateWebhookSignature,
   type WebhookEvent,
   type WebhookMessageData,

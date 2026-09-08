@@ -109,11 +109,38 @@ export interface WebhookEvent {
   created: number;
   /** Whether this event is from live mode (true) or sandbox (false) */
   livemode: boolean;
-  /** Event data containing the message object */
+  /** Event data containing the event's object */
   data: {
-    /** The message object that triggered this event */
+    /**
+     * The object that triggered this event.
+     *
+     * Typed as a message because that is what `message.*` events carry.
+     * Lifecycle events — `rcs_*`, `whatsapp_*`, `call.*`, `brand.*`,
+     * `campaign.*`, `assignment.*`, `number.*` and `port*` — carry a different
+     * object entirely, so read those with {@link webhookObject} rather than
+     * through these fields, which will be `undefined` at runtime.
+     */
     object: WebhookMessageObject;
   };
+}
+
+/**
+ * Read a lifecycle event's `data.object` as the shape you expect.
+ *
+ * `WebhookEvent.data.object` is typed as a message, which is wrong for every
+ * non-message event. The payload is always present at runtime; this is the
+ * supported way to reach it with the right type.
+ *
+ * ```ts
+ * if (event.type === "rcs_agent.live") {
+ *   const agent = webhookObject<{ agent_id: string; name: string; stage: string }>(event);
+ * }
+ * ```
+ */
+export function webhookObject<T = Record<string, unknown>>(
+  event: WebhookEvent,
+): T {
+  return event.data.object as unknown as T;
 }
 
 /**
