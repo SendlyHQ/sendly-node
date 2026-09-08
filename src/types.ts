@@ -2076,6 +2076,11 @@ export const ALL_SUPPORTED_COUNTRIES: string[] =
  * Webhook event types
  */
 export type WebhookEventType =
+  // Retired: the API has never emitted these and rejects them when you
+  // subscribe. Kept so existing code still compiles; they will go in the
+  // next major. Do not add them to a webhook's events array.
+  | "message.queued"
+  | "message.undelivered"
   | "message.sent"
   | "message.delivered"
   | "message.read"
