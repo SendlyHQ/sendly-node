@@ -1,5 +1,30 @@
 # @sendly/node
 
+## 3.40.0
+
+### Minor Changes
+
+- [`2a03a5d`](https://github.com/SendlyHQ/sendly/commit/2a03a5d177d430b804001487f6ea257c04f6ff59) Thanks [@sendly-live](https://github.com/sendly-live)! - **Python, Ruby and PHP now reach lifecycle webhook payloads too**, completing the fleet. Their `parse_event` built a message object out of every `data.object` and discarded the rest, so `rcs_*`, `whatsapp_*`, `call.*`, `brand.*`, `campaign.*`, `assignment.*`, `number.*` and `port*` events lost their payload — the same defect already fixed in the typed SDKs, and not one dynamic typing protected them from.
+
+  Three worse behaviours went with it, now fixed in all three:
+  - **Wrong-record risk.** On `contact.auto_flagged` the SDK reported the _contact_ id as the message id, so a handler keyed on it acted on the wrong row.
+  - **Invented values.** `segments=1`, `credits_used=0`, `direction="outbound"`, `to=""`, `from=""` were fabricated for events that never carried them. An absent field is now absent.
+  - **`null` no longer becomes `""`.** In-app calls legitimately have no `from`/`to`, and that is now distinguishable from an empty string.
+
+  Also: `message.opt_in` / `message.opt_out` are no longer treated as messages — they carry an opt-out record, and the message view for them was entirely null.
+
+- [`a477324`](https://github.com/SendlyHQ/sendly/commit/a4773240f95ac61bbd7478e5df6bf1a7c2d025ec) Thanks [@sendly-live](https://github.com/sendly-live)! - **Lifecycle webhook payloads are now reachable.** `WebhookEvent.data.object` is typed as a message, which is correct for `message.*` events and wrong for every other one: `rcs_*`, `whatsapp_*`, `call.*`, `brand.*`, `campaign.*`, `assignment.*`, `number.*` and `port*` carry a different object entirely, so reading `agent_id`, `stage` or `brand_id` through those fields gave `undefined`. A new `webhookObject<T>(event)` returns `data.object` as the shape you expect, and the type's docs now say which events it applies to.
+
+  The same gap is closed across the other SDKs: Go gains `RawObject` and `DecodeObject`, .NET `RawObject` and `ObjectAs<T>()`, Java `getRawObject()` and `objectAs(Class)`. In Rust — where this was a hard failure rather than a silent one — `data` becomes `Option` and a new `object` field carries the payload, shipping as 4.0.0.
+
+- [`3003ce8`](https://github.com/SendlyHQ/sendly/commit/3003ce8908e5519f1bb074f3a6a16edc57332091) Thanks [@sendly-live](https://github.com/sendly-live)! - **A response that isn't JSON now raises a diagnosable error instead of being returned as the result.** If `baseUrl` pointed at the origin rather than `https://sendly.live/api/v1`, or a proxy or security product answered instead of the API, the SDK returned the HTML page cast to the method's return type and the failure surfaced much later as a confusing type error. It now throws a `SendlyError` with code `invalid_response` naming the likely cause and quoting the start of the body, so an intercepted request is identifiable from the message alone.
+
+- [`c62b632`](https://github.com/SendlyHQ/sendly/commit/c62b632ecc4703f906e7abe3426523158812115d) Thanks [@sendly-live](https://github.com/sendly-live)! - **Every webhook event type the API emits is now in the SDK.** The typed event lists had drifted: `conversation.*`, `draft.*`, `rcs_brand.*`, `rcs_agent.*`, `whatsapp_account.*`, `whatsapp_template.*` and `call.*` were all missing, so there was no typed way to subscribe to RCS, WhatsApp or voice events. `message.queued` and `message.undelivered` are removed — the API never emitted them and rejects them when you subscribe.
+
+  `WebhookEvent.type` is now `WebhookEventType | (string & {})` instead of `WebhookEventType | string`, so unknown future types are still accepted but you keep autocomplete on the known ones.
+
+  `scripts/check-webhook-event-parity.mjs` runs in CI and fails if any SDK's list drifts from the server's again.
+
 ## 3.39.0
 
 ### Minor Changes
