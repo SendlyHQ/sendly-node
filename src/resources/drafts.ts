@@ -38,14 +38,14 @@ export class DraftsResource {
   async get(id: string): Promise<MessageDraft> {
     return this.http.request<MessageDraft>({
       method: "GET",
-      path: `/drafts/${id}`,
+      path: `/drafts/${encodeURIComponent(id)}`,
     });
   }
 
   async update(id: string, request: UpdateDraftRequest): Promise<MessageDraft> {
     return this.http.request<MessageDraft>({
       method: "PATCH",
-      path: `/drafts/${id}`,
+      path: `/drafts/${encodeURIComponent(id)}`,
       body: { ...request },
     });
   }
@@ -53,14 +53,14 @@ export class DraftsResource {
   async approve(id: string): Promise<MessageDraft> {
     return this.http.request<MessageDraft>({
       method: "POST",
-      path: `/drafts/${id}/approve`,
+      path: `/drafts/${encodeURIComponent(id)}/approve`,
     });
   }
 
   async reject(id: string, reason?: string): Promise<MessageDraft> {
     return this.http.request<MessageDraft>({
       method: "POST",
-      path: `/drafts/${id}/reject`,
+      path: `/drafts/${encodeURIComponent(id)}/reject`,
       body: reason ? { reason } : {},
     });
   }

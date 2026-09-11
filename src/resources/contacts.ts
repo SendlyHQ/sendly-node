@@ -107,7 +107,7 @@ export class ContactsResource {
   async get(id: string): Promise<Contact> {
     const response = await this.http.request<RawContact>({
       method: "GET",
-      path: `/contacts/${id}`,
+      path: `/contacts/${encodeURIComponent(id)}`,
     });
 
     return this.transformContact(response);
@@ -162,7 +162,7 @@ export class ContactsResource {
   async update(id: string, request: UpdateContactRequest): Promise<Contact> {
     const response = await this.http.request<RawContact>({
       method: "PATCH",
-      path: `/contacts/${id}`,
+      path: `/contacts/${encodeURIComponent(id)}`,
       body: {
         name: request.name,
         email: request.email,
@@ -186,7 +186,7 @@ export class ContactsResource {
   async delete(id: string): Promise<void> {
     await this.http.request<void>({
       method: "DELETE",
-      path: `/contacts/${id}`,
+      path: `/contacts/${encodeURIComponent(id)}`,
     });
   }
 
@@ -226,7 +226,7 @@ export class ContactsResource {
   async markValid(id: string): Promise<Contact> {
     const response = await this.http.request<RawContact>({
       method: "POST",
-      path: `/contacts/${id}/mark-valid`,
+      path: `/contacts/${encodeURIComponent(id)}/mark-valid`,
     });
     return this.transformContact(response);
   }
@@ -396,7 +396,7 @@ export class ContactListsResource {
     const queryString = params.toString();
     const response = await this.http.request<RawContactList>({
       method: "GET",
-      path: `/contact-lists/${id}${queryString ? `?${queryString}` : ""}`,
+      path: `/contact-lists/${encodeURIComponent(id)}${queryString ? `?${queryString}` : ""}`,
     });
 
     return this.transformList(response);
@@ -450,7 +450,7 @@ export class ContactListsResource {
   ): Promise<ContactList> {
     const response = await this.http.request<RawContactList>({
       method: "PATCH",
-      path: `/contact-lists/${id}`,
+      path: `/contact-lists/${encodeURIComponent(id)}`,
       body: {
         name: request.name,
         description: request.description,
@@ -475,7 +475,7 @@ export class ContactListsResource {
   async delete(id: string): Promise<void> {
     await this.http.request<void>({
       method: "DELETE",
-      path: `/contact-lists/${id}`,
+      path: `/contact-lists/${encodeURIComponent(id)}`,
     });
   }
 
@@ -505,7 +505,7 @@ export class ContactListsResource {
       added_count: number;
     }>({
       method: "POST",
-      path: `/contact-lists/${listId}/contacts`,
+      path: `/contact-lists/${encodeURIComponent(listId)}/contacts`,
       body: { contact_ids: contactIds },
     });
 
@@ -526,7 +526,7 @@ export class ContactListsResource {
   async removeContact(listId: string, contactId: string): Promise<void> {
     await this.http.request<void>({
       method: "DELETE",
-      path: `/contact-lists/${listId}/contacts/${contactId}`,
+      path: `/contact-lists/${encodeURIComponent(listId)}/contacts/${encodeURIComponent(contactId)}`,
     });
   }
 

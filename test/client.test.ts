@@ -179,6 +179,26 @@ describe("Sendly Client", () => {
       await expect(client.account.get()).rejects.toThrow(/Expected JSON from the Sendly API/);
     });
 
+    it("does not retry a non-JSON response — retrying cannot change who answered", async () => {
+      const client = new Sendly({
+        apiKey: "sk_test_v1_valid_key",
+        maxRetries: 3,
+      });
+
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Headers({ "Content-Type": "text/html" }),
+        text: async () => "<!DOCTYPE html><html><body>not the API</body></html>",
+      });
+      global.fetch = fetchMock;
+
+      await expect(client.account.get()).rejects.toThrow(/Expected JSON/);
+      // One attempt, not four: a wrong baseUrl or an intercepting proxy will
+      // answer identically every time, and the retry re-sends the request.
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
     it("surfaces an intercepted error page rather than a bare HTTP code", async () => {
       const client = new Sendly("sk_test_v1_valid_key");
 

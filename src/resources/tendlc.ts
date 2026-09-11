@@ -388,7 +388,7 @@ export class TenDlcResource {
   async getBrand(id: string): Promise<TenDlcBrandResponse> {
     return this.http.request<TenDlcBrandResponse>({
       method: "GET",
-      path: `/tendlc/brands/${id}`,
+      path: `/tendlc/brands/${encodeURIComponent(id)}`,
     });
   }
 
@@ -414,7 +414,7 @@ export class TenDlcResource {
   ): Promise<TenDlcQualifyResponse> {
     return this.http.request<TenDlcQualifyResponse>({
       method: "GET",
-      path: `/tendlc/brands/${brandId}/qualify/${useCase}`,
+      path: `/tendlc/brands/${encodeURIComponent(brandId)}/qualify/${encodeURIComponent(useCase)}`,
     });
   }
 
@@ -490,7 +490,7 @@ export class TenDlcResource {
   async getCampaign(id: string): Promise<TenDlcCampaignResponse> {
     return this.http.request<TenDlcCampaignResponse>({
       method: "GET",
-      path: `/tendlc/campaigns/${id}`,
+      path: `/tendlc/campaigns/${encodeURIComponent(id)}`,
     });
   }
 
@@ -520,7 +520,7 @@ export class TenDlcResource {
   ): Promise<TenDlcAssignmentResponse> {
     return this.http.request<TenDlcAssignmentResponse>({
       method: "POST",
-      path: `/tendlc/campaigns/${campaignId}/assign`,
+      path: `/tendlc/campaigns/${encodeURIComponent(campaignId)}/assign`,
       body: { phoneNumber },
     });
   }

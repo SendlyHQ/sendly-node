@@ -459,6 +459,15 @@ export class Sendly {
       };
     }
 
+    // Holds the API key: non-enumerable keeps it out of logs, JSON.stringify,
+    // spreads and error-reporter payloads.
+    Object.defineProperty(this, "config", {
+      value: this.config,
+      enumerable: false,
+      writable: false,
+      configurable: false,
+    });
+
     // Initialize HTTP client
     this.http = new HttpClient({
       apiKey: this.config.apiKey,

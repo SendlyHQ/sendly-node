@@ -1,5 +1,19 @@
 # @sendly/node
 
+## 4.0.0
+
+### Major Changes
+
+- Every Sendly SDK, the CLI and the MCP server now share one version. No public API was removed or changed in this package; the major aligns the fleet and carries the behaviour changes below.
+
+  - **Path parameters are percent-encoded.** Every id you pass is now encoded before it goes into the request path. An id containing `/`, `?` or `#` used to change which endpoint the request reached: an id of `../../account/keys` left its collection and hit another endpoint carrying your API key. Ordinary ids are sent byte-for-byte as before.
+  - **Plain HTTP is accepted only for this machine.** A `baseUrl` that is not `https://` must now be `localhost`, a `*.localhost` name, an address in `127.0.0.0/8`, or `[::1]`. The old check accepted any hostname that merely contained `localhost`, so `http://localhost.attacker.example` sent a live API key in cleartext. Any other `http://` base URL now throws when the client is constructed.
+  - **The API key is no longer an enumerable property of the client.** It no longer appears in `console.log(client)`, `JSON.stringify(client)`, object spreads or error-reporter payloads.
+
+### Patch Changes
+
+- A response that did not come from the API (`invalid_response`: a wrong `baseUrl`, a proxy, a captive portal) is no longer retried. It carried that response's status, so a non-JSON `200` fell through to the retry path and re-sent the request, POSTs included, to whatever answered.
+
 ## 3.40.0
 
 ### Minor Changes
@@ -19,11 +33,15 @@
 
 - [`3003ce8`](https://github.com/SendlyHQ/sendly/commit/3003ce8908e5519f1bb074f3a6a16edc57332091) Thanks [@sendly-live](https://github.com/sendly-live)! - **A response that isn't JSON now raises a diagnosable error instead of being returned as the result.** If `baseUrl` pointed at the origin rather than `https://sendly.live/api/v1`, or a proxy or security product answered instead of the API, the SDK returned the HTML page cast to the method's return type and the failure surfaced much later as a confusing type error. It now throws a `SendlyError` with code `invalid_response` naming the likely cause and quoting the start of the body, so an intercepted request is identifiable from the message alone.
 
-- [`c62b632`](https://github.com/SendlyHQ/sendly/commit/c62b632ecc4703f906e7abe3426523158812115d) Thanks [@sendly-live](https://github.com/sendly-live)! - **Every webhook event type the API emits is now in the SDK.** The typed event lists had drifted: `conversation.*`, `draft.*`, `rcs_brand.*`, `rcs_agent.*`, `whatsapp_account.*`, `whatsapp_template.*` and `call.*` were all missing, so there was no typed way to subscribe to RCS, WhatsApp or voice events. `message.queued` and `message.undelivered` are removed — the API never emitted them and rejects them when you subscribe.
+- [`c62b632`](https://github.com/SendlyHQ/sendly/commit/c62b632ecc4703f906e7abe3426523158812115d) Thanks [@sendly-live](https://github.com/sendly-live)! - **Every webhook event type the API emits is now in the SDK.** The typed event lists had drifted: `conversation.*`, `draft.*`, `rcs_brand.*`, `rcs_agent.*`, `whatsapp_account.*`, `whatsapp_template.*` and `call.*` were all missing, so there was no typed way to subscribe to RCS, WhatsApp or voice events. `message.queued` and `message.undelivered` are **deprecated, not removed** (restored in [`5f2b7e8`](https://github.com/SendlyHQ/sendly/commit/5f2b7e805764255fd429497da38ead898daf8f0f) so this stays a clean minor). The API has never emitted either one and rejects both with a 400 when you subscribe, so drop them from any webhook's `events` array now; they leave `WebhookEventType` in the next major.
 
   `WebhookEvent.type` is now `WebhookEventType | (string & {})` instead of `WebhookEventType | string`, so unknown future types are still accepted but you keep autocomplete on the known ones.
 
   `scripts/check-webhook-event-parity.mjs` runs in CI and fails if any SDK's list drifts from the server's again.
+
+- **Worth knowing before you upgrade.** Nothing was removed or renamed and there is no runtime change, but two type-level details can surface at compile time:
+  - `WebhookEventType` gained nineteen members (`conversation.*`, `draft.*`, `rcs_brand.*`, `rcs_agent.*`, `whatsapp_account.*`, `whatsapp_template.*`, `call.*`). An exhaustive `switch` over it, or a `Record<WebhookEventType, ...>`, now needs the new members or a `default` branch.
+  - `webhookObject<T>(event)` is an unchecked cast, not a validator: it returns `data.object` under the type you name without verifying the payload matches. It is the supported way to read a lifecycle event, but the shape is yours to get right.
 
 ## 3.39.0
 

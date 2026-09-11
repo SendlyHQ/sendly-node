@@ -140,7 +140,7 @@ export class TemplatesResource {
       updated_at: string;
     }>({
       method: "GET",
-      path: `/templates/${id}`,
+      path: `/templates/${encodeURIComponent(id)}`,
     });
 
     return this.transformTemplate(response);
@@ -219,7 +219,7 @@ export class TemplatesResource {
       updated_at: string;
     }>({
       method: "PATCH",
-      path: `/templates/${id}`,
+      path: `/templates/${encodeURIComponent(id)}`,
       body: {
         ...(request.name && { name: request.name }),
         ...(request.text && { text: request.text }),
@@ -258,7 +258,7 @@ export class TemplatesResource {
       updated_at: string;
     }>({
       method: "POST",
-      path: `/templates/${id}/publish`,
+      path: `/templates/${encodeURIComponent(id)}/publish`,
     });
 
     return this.transformTemplate(response);
@@ -293,7 +293,7 @@ export class TemplatesResource {
       variables: Array<{ key: string; type: string; fallback?: string }>;
     }>({
       method: "POST",
-      path: `/templates/${id}/preview`,
+      path: `/templates/${encodeURIComponent(id)}/preview`,
       body: variables ? { variables } : {},
     });
 
@@ -325,7 +325,7 @@ export class TemplatesResource {
   async delete(id: string): Promise<void> {
     await this.http.request<void>({
       method: "DELETE",
-      path: `/templates/${id}`,
+      path: `/templates/${encodeURIComponent(id)}`,
     });
   }
 
@@ -367,7 +367,7 @@ export class TemplatesResource {
       updated_at: string;
     }>({
       method: "POST",
-      path: `/templates/${id}/clone`,
+      path: `/templates/${encodeURIComponent(id)}/clone`,
       body: options?.name ? { name: options.name } : {},
     });
 

@@ -27,6 +27,24 @@ export interface HttpClientConfig {
 }
 
 /**
+ * True only for hostnames that resolve to the local machine. Matched exactly,
+ * never by substring: `localhost.example.com` is a routable host an attacker
+ * controls, and a substring test sends a live key there over plaintext HTTP.
+ */
+function isLoopbackHostname(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+
+  if (host === "localhost" || host.endsWith(".localhost")) return true;
+
+  if (host === "[::1]" || host === "::1") return true;
+
+  const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+  if (!v4) return false;
+  const octets = v4.slice(1).map(Number);
+  return octets[0] === 127 && octets.every((o) => o <= 255);
+}
+
+/**
  * HTTP client for making API requests
  */
 export class HttpClient {
@@ -42,6 +60,15 @@ export class HttpClient {
       maxRetries: config.maxRetries ?? DEFAULT_MAX_RETRIES,
     };
 
+    // Holds the API key: non-enumerable keeps it out of logs, JSON.stringify,
+    // spreads and error-reporter payloads.
+    Object.defineProperty(this, "config", {
+      value: this.config,
+      enumerable: false,
+      writable: false,
+      configurable: false,
+    });
+
     this.organizationId = config.organizationId || process.env.SENDLY_ORG_ID || undefined;
 
     // Validate API key format
@@ -51,13 +78,9 @@ export class HttpClient {
       );
     }
 
-    // Validate HTTPS for non-localhost URLs to protect API key
+    // Validate HTTPS for non-loopback URLs to protect API key
     const baseUrl = new URL(this.config.baseUrl);
-    if (
-      baseUrl.protocol !== "https:" &&
-      !baseUrl.hostname.includes("localhost") &&
-      baseUrl.hostname !== "127.0.0.1"
-    ) {
+    if (baseUrl.protocol !== "https:" && !isLoopbackHostname(baseUrl.hostname)) {
       throw new Error(
         "API key must only be transmitted over HTTPS. Use https:// or localhost for development.",
       );
@@ -142,6 +165,16 @@ export class HttpClient {
 
           // Don't retry rate limiting - throw immediately so caller can decide
           if (error instanceof RateLimitError) {
+            throw error;
+          }
+
+          // Don't retry a response that was not the API. invalid_response means
+          // something other than Sendly answered — a wrong baseUrl, a proxy, a
+          // captive portal — and retrying cannot change that. It carries the
+          // response's own status, so a non-JSON 200 would otherwise fall
+          // through to the 5xx branch and re-send the request, POSTs included,
+          // against whatever that endpoint is.
+          if (error.code === "invalid_response") {
             throw error;
           }
         }

@@ -31,7 +31,7 @@ export class RulesResource {
   async update(id: string, request: UpdateAutoLabelRuleRequest): Promise<AutoLabelRule> {
     return this.http.request<AutoLabelRule>({
       method: "PATCH",
-      path: `/rules/${id}`,
+      path: `/rules/${encodeURIComponent(id)}`,
       body: { ...request },
     });
   }
@@ -39,7 +39,7 @@ export class RulesResource {
   async delete(id: string): Promise<void> {
     await this.http.request<void>({
       method: "DELETE",
-      path: `/rules/${id}`,
+      path: `/rules/${encodeURIComponent(id)}`,
     });
   }
 }

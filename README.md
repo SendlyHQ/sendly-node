@@ -309,7 +309,7 @@ console.log(`Test ${testResult.success ? 'passed' : 'failed'}`);
 
 // Rotate webhook secret
 const rotation = await sendly.webhooks.rotateSecret('whk_xxx');
-console.log(`New secret: ${rotation.secret}`);
+console.log(`New secret: ${rotation.newSecret}`);
 
 // View delivery history
 const deliveries = await sendly.webhooks.getDeliveries('whk_xxx');
@@ -339,10 +339,10 @@ app.post('/webhooks/sendly', (req, res) => {
     
     switch (event.type) {
       case 'message.delivered':
-        console.log(`Message ${event.data.id} delivered`);
+        console.log(`Message ${event.data.object.id} delivered`);
         break;
       case 'message.failed':
-        console.log(`Message ${event.data.id} failed: ${event.data.errorCode}`);
+        console.log(`Message ${event.data.object.id} failed: ${event.data.object.error}`);
         break;
     }
     
@@ -353,6 +353,73 @@ app.post('/webhooks/sendly', (req, res) => {
   }
 });
 ```
+
+### Lifecycle Events
+
+`WebhookEvent.data.object` is typed as a message, which is right for `message.*` and
+wrong for everything else. Lifecycle events — `rcs_*`, `whatsapp_*`, `call.*`,
+`brand.*`, `campaign.*`, `assignment.*`, `number.*`, `port*` and `contact.*` — carry a
+different object entirely, so the message fields you reach for are `undefined` at
+runtime. Read those with `webhookObject<T>(event)`, which hands you `data.object` as
+the shape you declare.
+
+```typescript
+import { Webhooks, webhookObject, type WebhookEvent } from '@sendly/node';
+
+const webhooks = new Webhooks(process.env.SENDLY_WEBHOOK_SECRET!);
+
+interface RcsAgentObject {
+  agent_id: string;
+  name: string;
+  stage: string;
+}
+
+interface NumberObject {
+  id: string;
+  phone: string;
+  status: string;
+  country_code: string | null;
+}
+
+app.post('/webhooks/sendly', (req, res) => {
+  let event: WebhookEvent;
+  try {
+    event = webhooks.parse(
+      req.body, // raw body string, not parsed JSON
+      req.headers['x-sendly-signature'] as string,
+      req.headers['x-sendly-timestamp'] as string
+    );
+  } catch {
+    return res.status(401).send('Invalid signature');
+  }
+
+  switch (event.type) {
+    case 'message.delivered':
+      // message.* events: data.object really is a message
+      console.log(`Message ${event.data.object.id} delivered`);
+      break;
+
+    case 'rcs_agent.live': {
+      const agent = webhookObject<RcsAgentObject>(event);
+      console.log(`RCS agent ${agent.agent_id} (${agent.name}) is ${agent.stage}`);
+      break;
+    }
+
+    case 'number.activated': {
+      const number = webhookObject<NumberObject>(event);
+      console.log(`${number.phone} activated (${number.id})`);
+      break;
+    }
+  }
+
+  res.status(200).send('OK');
+});
+```
+
+`webhookObject` is a cast, not a validator: it returns `data.object` under the type you
+name and does not check the payload against it. Note also that `data.object.id` is the
+id of whatever the event is about — a contact id on `contact.auto_flagged`, a
+phone-number id on `number.activated`. Only treat it as a message id on `message.*`.
 
 ## Account & Credits
 

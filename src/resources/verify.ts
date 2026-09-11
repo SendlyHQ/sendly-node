@@ -213,7 +213,7 @@ export class VerifyResource {
       message?: string;
     }>({
       method: "POST",
-      path: `/verify/${id}/resend`,
+      path: `/verify/${encodeURIComponent(id)}/resend`,
     });
 
     return {
@@ -259,7 +259,7 @@ export class VerifyResource {
       remaining_attempts?: number;
     }>({
       method: "POST",
-      path: `/verify/${id}/check`,
+      path: `/verify/${encodeURIComponent(id)}/check`,
       body: { code: request.code },
     });
 
@@ -301,7 +301,7 @@ export class VerifyResource {
       profile_id?: string;
     }>({
       method: "GET",
-      path: `/verify/${id}`,
+      path: `/verify/${encodeURIComponent(id)}`,
     });
 
     return {

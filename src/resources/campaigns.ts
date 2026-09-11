@@ -139,7 +139,7 @@ export class CampaignsResource {
   async get(id: string): Promise<Campaign> {
     const response = await this.http.request<RawCampaign>({
       method: "GET",
-      path: `/campaigns/${id}`,
+      path: `/campaigns/${encodeURIComponent(id)}`,
     });
 
     return this.transformCampaign(response);
@@ -163,7 +163,7 @@ export class CampaignsResource {
   async update(id: string, request: UpdateCampaignRequest): Promise<Campaign> {
     const response = await this.http.request<RawCampaign>({
       method: "PATCH",
-      path: `/campaigns/${id}`,
+      path: `/campaigns/${encodeURIComponent(id)}`,
       body: {
         ...(request.name && { name: request.name }),
         ...(request.text && { text: request.text }),
@@ -194,7 +194,7 @@ export class CampaignsResource {
   async delete(id: string): Promise<void> {
     await this.http.request<void>({
       method: "DELETE",
-      path: `/campaigns/${id}`,
+      path: `/campaigns/${encodeURIComponent(id)}`,
     });
   }
 
@@ -235,7 +235,7 @@ export class CampaignsResource {
       }>;
     }>({
       method: "GET",
-      path: `/campaigns/${id}/preview`,
+      path: `/campaigns/${encodeURIComponent(id)}/preview`,
     });
 
     return {
@@ -269,7 +269,7 @@ export class CampaignsResource {
   async send(id: string): Promise<Campaign> {
     const response = await this.http.request<RawCampaign>({
       method: "POST",
-      path: `/campaigns/${id}/send`,
+      path: `/campaigns/${encodeURIComponent(id)}/send`,
     });
 
     return this.transformCampaign(response);
@@ -298,7 +298,7 @@ export class CampaignsResource {
   ): Promise<Campaign> {
     const response = await this.http.request<RawCampaign>({
       method: "POST",
-      path: `/campaigns/${id}/schedule`,
+      path: `/campaigns/${encodeURIComponent(id)}/schedule`,
       body: {
         scheduledAt: request.scheduledAt,
         timezone: request.timezone,
@@ -323,7 +323,7 @@ export class CampaignsResource {
   async cancel(id: string): Promise<Campaign> {
     const response = await this.http.request<RawCampaign>({
       method: "POST",
-      path: `/campaigns/${id}/cancel`,
+      path: `/campaigns/${encodeURIComponent(id)}/cancel`,
     });
 
     return this.transformCampaign(response);
@@ -346,7 +346,7 @@ export class CampaignsResource {
   async clone(id: string): Promise<Campaign> {
     const response = await this.http.request<RawCampaign>({
       method: "POST",
-      path: `/campaigns/${id}/clone`,
+      path: `/campaigns/${encodeURIComponent(id)}/clone`,
     });
 
     return this.transformCampaign(response);

@@ -892,7 +892,7 @@ class RcsBrandsResource {
   ): Promise<RcsBrandResponse> {
     return this.http.request<RcsBrandResponse>({
       method: "PATCH",
-      path: `/rcs/brands/${id}`,
+      path: `/rcs/brands/${encodeURIComponent(id)}`,
       idempotencyKey: options?.idempotencyKey,
       body: { ...request },
     });
@@ -997,7 +997,7 @@ class RcsAgentsResource {
   async get(id: string): Promise<RcsAgentDetailResponse> {
     return this.http.request<RcsAgentDetailResponse>({
       method: "GET",
-      path: `/rcs/agents/${id}`,
+      path: `/rcs/agents/${encodeURIComponent(id)}`,
     });
   }
 
@@ -1053,7 +1053,7 @@ class RcsAgentsResource {
   ): Promise<RcsAgentResponse> {
     return this.http.request<RcsAgentResponse>({
       method: "PATCH",
-      path: `/rcs/agents/${id}`,
+      path: `/rcs/agents/${encodeURIComponent(id)}`,
       idempotencyKey: options?.idempotencyKey,
       body: { ...request },
     });
@@ -1091,7 +1091,7 @@ class RcsAgentsResource {
   ): Promise<RcsTestDeviceListResponse> {
     return this.http.request<RcsTestDeviceListResponse>({
       method: "PUT",
-      path: `/rcs/agents/${id}/test-devices`,
+      path: `/rcs/agents/${encodeURIComponent(id)}/test-devices`,
       idempotencyKey: options?.idempotencyKey,
       body: { devices },
     });
@@ -1131,7 +1131,7 @@ class RcsAgentsResource {
   ): Promise<RcsAgentReviewResponse> {
     return this.http.request<RcsAgentReviewResponse>({
       method: "POST",
-      path: `/rcs/agents/${id}/submit`,
+      path: `/rcs/agents/${encodeURIComponent(id)}/submit`,
       idempotencyKey: options?.idempotencyKey,
       body: {},
     });
@@ -1173,7 +1173,7 @@ class RcsAgentsResource {
   ): Promise<RcsAgentReviewResponse> {
     return this.http.request<RcsAgentReviewResponse>({
       method: "POST",
-      path: `/rcs/agents/${id}/request-launch`,
+      path: `/rcs/agents/${encodeURIComponent(id)}/request-launch`,
       idempotencyKey: options?.idempotencyKey,
       body: { ...request },
     });

@@ -30,7 +30,7 @@ export class LabelsResource {
   async delete(id: string): Promise<void> {
     await this.http.request<void>({
       method: "DELETE",
-      path: `/labels/${id}`,
+      path: `/labels/${encodeURIComponent(id)}`,
     });
   }
 }

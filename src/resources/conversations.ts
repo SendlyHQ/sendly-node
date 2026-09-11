@@ -40,14 +40,14 @@ export class ConversationsResource {
     const qs = params.toString();
     return this.http.request<ConversationWithMessages>({
       method: "GET",
-      path: `/conversations/${id}${qs ? `?${qs}` : ""}`,
+      path: `/conversations/${encodeURIComponent(id)}${qs ? `?${qs}` : ""}`,
     });
   }
 
   async reply(conversationId: string, request: ReplyToConversationRequest): Promise<Message> {
     return this.http.request<Message>({
       method: "POST",
-      path: `/conversations/${conversationId}/messages`,
+      path: `/conversations/${encodeURIComponent(conversationId)}/messages`,
       body: { ...request },
     });
   }
@@ -55,7 +55,7 @@ export class ConversationsResource {
   async update(id: string, request: UpdateConversationRequest): Promise<Conversation> {
     return this.http.request<Conversation>({
       method: "PATCH",
-      path: `/conversations/${id}`,
+      path: `/conversations/${encodeURIComponent(id)}`,
       body: { ...request },
     });
   }
@@ -63,21 +63,21 @@ export class ConversationsResource {
   async markRead(id: string): Promise<Conversation> {
     return this.http.request<Conversation>({
       method: "POST",
-      path: `/conversations/${id}/mark-read`,
+      path: `/conversations/${encodeURIComponent(id)}/mark-read`,
     });
   }
 
   async close(id: string): Promise<Conversation> {
     return this.http.request<Conversation>({
       method: "POST",
-      path: `/conversations/${id}/close`,
+      path: `/conversations/${encodeURIComponent(id)}/close`,
     });
   }
 
   async reopen(id: string): Promise<Conversation> {
     return this.http.request<Conversation>({
       method: "POST",
-      path: `/conversations/${id}/reopen`,
+      path: `/conversations/${encodeURIComponent(id)}/reopen`,
     });
   }
 
@@ -87,21 +87,21 @@ export class ConversationsResource {
     const qs = params.toString();
     return this.http.request<ConversationContext>({
       method: "GET",
-      path: `/conversations/${conversationId}/context${qs ? `?${qs}` : ""}`,
+      path: `/conversations/${encodeURIComponent(conversationId)}/context${qs ? `?${qs}` : ""}`,
     });
   }
 
   async suggestReplies(conversationId: string): Promise<SuggestRepliesResponse> {
     return this.http.request<SuggestRepliesResponse>({
       method: "POST",
-      path: `/conversations/${conversationId}/suggest-replies`,
+      path: `/conversations/${encodeURIComponent(conversationId)}/suggest-replies`,
     });
   }
 
   async addLabels(conversationId: string, labelIds: string[]): Promise<LabelListResponse> {
     return this.http.request<LabelListResponse>({
       method: "POST",
-      path: `/conversations/${conversationId}/labels`,
+      path: `/conversations/${encodeURIComponent(conversationId)}/labels`,
       body: { labelIds },
     });
   }
@@ -109,7 +109,7 @@ export class ConversationsResource {
   async removeLabel(conversationId: string, labelId: string): Promise<void> {
     await this.http.request<void>({
       method: "DELETE",
-      path: `/conversations/${conversationId}/labels/${labelId}`,
+      path: `/conversations/${encodeURIComponent(conversationId)}/labels/${encodeURIComponent(labelId)}`,
     });
   }
 }
