@@ -2135,7 +2135,11 @@ export type WebhookEventType =
   | "whatsapp_template.paused"
   | "call.started"
   | "call.completed"
-  | "call.recording.ready";
+  | "call.recording.ready"
+  | "short_code.action_required"
+  | "short_code.rejected"
+  | "short_code.filed"
+  | "short_code.live";
 
 /**
  * Source of a list-health event. Frozen enum — new values will be
