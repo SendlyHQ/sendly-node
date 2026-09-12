@@ -24,6 +24,7 @@ import { TenDlcResource } from "./resources/tendlc";
 import { LinksResource } from "./resources/links";
 import { WhatsAppResource } from "./resources/whatsapp";
 import { RcsResource } from "./resources/rcs";
+import { ShortCodesResource } from "./resources/shortCodes";
 
 const DEFAULT_BASE_URL = "https://sendly.live/api/v1";
 const DEFAULT_TIMEOUT = 30000;
@@ -433,6 +434,18 @@ export class Sendly {
    */
   public readonly rcs: RcsResource;
 
+  /**
+   * Short codes — apply for a 5 or 6 digit US sender and track the
+   * application through review, the carrier forms, and certification.
+   *
+   * @example
+   * ```typescript
+   * const view = await sendly.shortCodes.application.get();
+   * const { shortCodes } = await sendly.shortCodes.list();
+   * ```
+   */
+  public readonly shortCodes: ShortCodesResource;
+
   private readonly http: HttpClient;
   private readonly config: Required<Pick<SendlyConfig, "apiKey" | "baseUrl" | "timeout" | "maxRetries">> & Pick<SendlyConfig, "organizationId">;
 
@@ -497,6 +510,7 @@ export class Sendly {
     this.links = new LinksResource(this.http);
     this.whatsapp = new WhatsAppResource(this.http);
     this.rcs = new RcsResource(this.http);
+    this.shortCodes = new ShortCodesResource(this.http);
   }
 
   /**

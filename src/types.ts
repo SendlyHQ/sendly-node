@@ -3803,3 +3803,139 @@ export interface UploadVerificationDocumentResponse {
   url: string;
   id: string;
 }
+
+/** A compliance problem with a short code application, by field. */
+export interface ShortCodeIssue {
+  path: string;
+  message: string;
+}
+
+/** A carrier form the application needs, and where it stands. */
+export interface ShortCodeDocument {
+  kind: string;
+  templateReady: boolean;
+  signedAt: string | null;
+  signedByName: string | null;
+  awaitingSignature: boolean;
+}
+
+/** The short code application a workspace is filling in, or has filed. */
+export interface ShortCodeApplication {
+  id: string | null;
+  shortCode: string | null;
+  countryCode: string;
+  status: string;
+  reviewStatus: string;
+  reviewNote: string | null;
+  orderType: "new" | "migration";
+  codeType: "random" | "vanity";
+  contentProviderSameAsBrand: boolean;
+  sampleMessages: string[];
+  useCase: string | null;
+  optInFlow: string | null;
+  optInConfirmation: string | null;
+  helpResponse: string | null;
+  stopConfirmation: string | null;
+  messageFrequency: string | null;
+  campaignKeyword: string | null;
+  expectedMonthlyVolume: string | null;
+  expectedDailyVolume: string | null;
+  privacyPolicyUrl: string | null;
+  termsUrl: string | null;
+  requestedDigits: string | null;
+  losingProvider: string | null;
+  brandContactName: string | null;
+  brandContactEmail: string | null;
+  brandContactPhone: string | null;
+  contentProviderLegalName: string | null;
+  contentProviderEin: string | null;
+  contentProviderContactName: string | null;
+  contentProviderContactEmail: string | null;
+  contentProviderContactPhone: string | null;
+  brandRegistrationStatus: string;
+  contentProviderRegistrationStatus: string;
+  submittedAt: string | null;
+  filedAt: string | null;
+  activatedAt: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+/** The application plus everything the caller needs to act on it. */
+export interface ShortCodeApplicationView {
+  enabled: boolean;
+  application: ShortCodeApplication;
+  editable: boolean;
+  lockMessage: string | null;
+  canStartNewApplication: boolean;
+  requiredDocuments: string[];
+  missingDocuments: string[];
+  documents: ShortCodeDocument[];
+  quote: {
+    codeType: "random" | "vanity";
+    monthlyUsd: number | null;
+    currency: "USD";
+    autoBilled: false;
+  };
+  carriers: {
+    approved: number;
+    total: number;
+    overall: "not_submitted" | "in_progress" | "approved" | "rejected";
+  };
+  submitted?: boolean;
+  alreadySubmitted?: boolean;
+  ignoredFields?: string[];
+}
+
+/** What a dry run of the application says, without changing anything. */
+export interface ShortCodePreflight {
+  ok: boolean;
+  issues: ShortCodeIssue[];
+  requiredDocuments: string[];
+  missingDocuments: string[];
+  documents: ShortCodeDocument[];
+  ignoredFields?: string[];
+}
+
+/** A short code leased to the workspace. */
+export interface ShortCode {
+  id: string;
+  shortCode: string | null;
+  countryCode: string;
+  status: string;
+  useCase: string;
+  createdAt: string;
+}
+
+/** Fields a caller may set on the application. */
+export type ShortCodeApplicationInput = Partial<
+  Pick<
+    ShortCodeApplication,
+    | "useCase"
+    | "optInFlow"
+    | "optInConfirmation"
+    | "helpResponse"
+    | "stopConfirmation"
+    | "messageFrequency"
+    | "campaignKeyword"
+    | "expectedMonthlyVolume"
+    | "expectedDailyVolume"
+    | "privacyPolicyUrl"
+    | "termsUrl"
+    | "countryCode"
+    | "orderType"
+    | "codeType"
+    | "requestedDigits"
+    | "losingProvider"
+    | "brandContactName"
+    | "brandContactEmail"
+    | "brandContactPhone"
+    | "contentProviderLegalName"
+    | "contentProviderEin"
+    | "contentProviderContactName"
+    | "contentProviderContactEmail"
+    | "contentProviderContactPhone"
+    | "contentProviderSameAsBrand"
+    | "sampleMessages"
+  >
+>;
