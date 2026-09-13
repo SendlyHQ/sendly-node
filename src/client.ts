@@ -25,6 +25,7 @@ import { LinksResource } from "./resources/links";
 import { WhatsAppResource } from "./resources/whatsapp";
 import { RcsResource } from "./resources/rcs";
 import { ShortCodesResource } from "./resources/shortCodes";
+import { CallsResource } from "./resources/calls";
 
 const DEFAULT_BASE_URL = "https://sendly.live/api/v1";
 const DEFAULT_TIMEOUT = 30000;
@@ -446,6 +447,46 @@ export class Sendly {
    */
   public readonly shortCodes: ShortCodesResource;
 
+  /**
+   * Calls API resource - phone calls handled by your AI agents.
+   *
+   * Place an outbound call that one of your workspace's AI agents talks
+   * on, follow it while it rings and runs, read the transcript once it
+   * ends, hang up early, and fetch the recording. Calls are prepaid per
+   * started minute (an agent-handled outbound call is 10 credits a minute);
+   * unanswered calls cost nothing. The `from` number must be voice-enabled
+   * in the dashboard, and writes need a live API key.
+   *
+   * @example
+   * ```typescript
+   * // Have an agent call someone
+   * const call = await sendly.calls.create({
+   *   to: '+15555550123',
+   *   agentId: '3c4d5e6f-7081-4293-a4b5-c6d7e8f90a1b',
+   *   context: 'You are calling Jordan to confirm the 3pm appointment on Tuesday.',
+   *   metadata: { crmId: 'lead_8812' },
+   * });
+   * console.log(call.status); // "ringing"
+   *
+   * // Follow it
+   * const current = await sendly.calls.get(call.id);
+   * if (current.status === 'completed') {
+   *   console.log(current.durationSecs, current.creditsCharged, current.transcript);
+   * }
+   *
+   * // List recent completed calls
+   * const { data, pagination } = await sendly.calls.list({ status: 'completed', limit: 20 });
+   *
+   * // End a call early
+   * await sendly.calls.hangup(call.id);
+   *
+   * // Fetch the recording once call.recording.ready fires
+   * const recording = await sendly.calls.recording(call.id);
+   * if (recording.status === 'ready') console.log(recording.url, recording.expiresAt);
+   * ```
+   */
+  public readonly calls: CallsResource;
+
   private readonly http: HttpClient;
   private readonly config: Required<Pick<SendlyConfig, "apiKey" | "baseUrl" | "timeout" | "maxRetries">> & Pick<SendlyConfig, "organizationId">;
 
@@ -511,6 +552,7 @@ export class Sendly {
     this.whatsapp = new WhatsAppResource(this.http);
     this.rcs = new RcsResource(this.http);
     this.shortCodes = new ShortCodesResource(this.http);
+    this.calls = new CallsResource(this.http);
   }
 
   /**

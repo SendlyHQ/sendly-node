@@ -124,6 +124,18 @@ export interface OwnedNumber {
   pendingCancellation: boolean;
   /** When a scheduled release takes effect (ISO 8601), or `null`. */
   scheduledReleaseAt: string | null;
+  /**
+   * True when the number can take and place phone calls. Present on the
+   * {@link NumbersResource.list} projection; use it to pick a `from`
+   * number for `sendly.calls.create`.
+   */
+  voiceEnabled?: boolean;
+  /**
+   * How the number answers calls: `none` (voice off), `ring_dashboard`
+   * (rings the team in the dashboard) or `agent` (an AI agent answers).
+   * Present on the {@link NumbersResource.list} projection.
+   */
+  voiceMode?: "none" | "ring_dashboard" | "agent";
 }
 
 /**

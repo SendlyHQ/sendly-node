@@ -160,6 +160,22 @@ export type {
   RcsAgentReviewResponse,
 } from "./resources/rcs";
 
+// Types - Voice calls
+export type {
+  Call,
+  CallStatus,
+  CallDirection,
+  CallKind,
+  CallHandledBy,
+  CallBilling,
+  CallRecordingStatus,
+  CallTranscriptLine,
+  CreateCallRequest,
+  ListCallsOptions,
+  CallListResponse,
+  CallRecording,
+} from "./resources/calls";
+
 // Types - Links (URL shortening)
 export type {
   CreateShortLinkRequest,

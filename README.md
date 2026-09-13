@@ -805,6 +805,69 @@ await sendly.messages.send({
 });
 ```
 
+## Voice Calls
+
+Place phone calls that one of your workspace's AI agents handles, follow
+them while they ring and run, read the transcript, hang up early, and fetch
+recordings. Reads need the `calls:read` scope and writes `calls:write`;
+writes need a live API key. Destinations are US and Canadian numbers.
+
+Calls are prepaid from your credit balance per started minute: an
+agent-handled outbound call is 10 credits a minute (2 for the call, 8 for
+the agent), and unanswered calls cost nothing. The `from` number must be
+voice-enabled in the dashboard (Calls → Settings) with an emergency address
+registered; `sendly.numbers.list()` shows `voiceEnabled` and `voiceMode`
+per number. Voice is being enabled workspace by workspace; until it is on
+for yours, every call method responds `404 voice_not_enabled`.
+
+```typescript
+// Have an agent call someone (from is optional with one voice-enabled number)
+const call = await sendly.calls.create({
+  to: '+15555550123',
+  agentId: '3c4d5e6f-7081-4293-a4b5-c6d7e8f90a1b',
+  from: '+15555550188',
+  context: 'You are calling Jordan to confirm the 3pm appointment on Tuesday.',
+  metadata: { crmId: 'lead_8812' },
+});
+console.log(call.id, call.status); // "6f1c2d3e-...", "ringing"
+
+// List calls, newest first, with filters and pagination
+const { data, pagination } = await sendly.calls.list({
+  status: 'completed',
+  direction: 'outbound',
+  limit: 20,
+});
+for (const c of data) {
+  console.log(`${c.to} ${c.durationSecs}s ${c.creditsCharged} credits ${c.hangupClass}`);
+}
+if (pagination.hasMore) {
+  await sendly.calls.list({ status: 'completed', limit: 20, offset: 20 });
+}
+
+// Retrieve a call; agent-handled calls include the transcript
+const current = await sendly.calls.get(call.id);
+for (const line of current.transcript ?? []) {
+  console.log(`${line.speaker}: ${line.text}`);
+}
+
+// End a call early: ringing -> cancelled, active -> completed
+await sendly.calls.hangup(call.id);
+
+// Fetch the recording (Ogg/Opus). The signed URL is valid for five minutes.
+const recording = await sendly.calls.recording(call.id);
+if (recording.status === 'ready') {
+  console.log(recording.url, recording.expiresAt); // audio/ogg
+}
+```
+
+Refusals come back as `SendlyError` with a code: `agent_not_found` (404),
+`agent_disabled` (409), `from_number_required` (400), `e911_required` (428,
+register an emergency address first), `lines_busy` (409, retry shortly),
+`daily_call_limit` (429), and `call_not_found` (404). A balance below one
+minute at the agent rate throws `InsufficientCreditsError`. The
+`call.started`, `call.completed` and `call.recording.ready` webhooks carry
+the same call as a snake_case object (see [Lifecycle Events](#lifecycle-events)).
+
 ## Error Handling
 
 The SDK provides typed error classes for different error scenarios:
@@ -958,6 +1021,7 @@ new Sendly(config: SendlyConfig)
 - `messages` - Messages resource
 - `webhooks` - Webhooks resource
 - `account` - Account resource
+- `calls` - Voice calls resource
 
 #### Methods
 
@@ -1070,6 +1134,28 @@ Get an API key by ID.
 #### `getApiKeyUsage(id: string): Promise<ApiKeyUsage>`
 
 Get usage statistics for an API key.
+
+### `sendly.calls`
+
+#### `create(request: CreateCallRequest, options?: IdempotentRequestOptions): Promise<Call>`
+
+Place a phone call handled by an AI agent. Requires `calls:write` and a live key; returns the call while it rings.
+
+#### `list(options?: ListCallsOptions): Promise<CallListResponse>`
+
+List calls, newest first. Filters: `status`, `direction`, `kind`, `agentId`, `to`, `from`; pagination via `limit` (1-100) and `offset`.
+
+#### `get(id: string): Promise<Call>`
+
+Retrieve a call. Agent-handled calls include `transcript`.
+
+#### `hangup(id: string, options?: IdempotentRequestOptions): Promise<Call>`
+
+End a call. Ringing becomes `cancelled`, active becomes `completed`; an ended call is returned unchanged.
+
+#### `recording(id: string): Promise<CallRecording>`
+
+Fetch a call's recording status and, when `ready`, a signed `url` valid for five minutes.
 
 ## Enterprise
 
