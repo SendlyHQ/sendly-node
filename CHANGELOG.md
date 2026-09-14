@@ -1,11 +1,18 @@
 # @sendly/node
 
+## 4.1.0
+
+### Minor Changes
+
+- [#103](https://github.com/SendlyHQ/sendly/pull/103) [`221fa0a`](https://github.com/SendlyHQ/sendly/commit/221fa0ac020144c345dcae01fb645df371c8e112) Thanks [@sendly-live](https://github.com/sendly-live)! - Added the Voice Calls API: `calls.create/list/get/hangup/recording` in the Node SDK (with the `Call`, `CallListResponse`, `CallRecording` and transcript types, `voiceEnabled`/`voiceMode` on owned numbers, and the new voice error codes), plus the five `*_call` tools in the MCP server.
+- [#101](https://github.com/SendlyHQ/sendly/pull/101) Added `sendly.shortCodes` for applying for a US short code: `application.get`, `application.update`, `application.check` and `application.submit`, plus `list()` for the workspace's codes, with the `ShortCode`, `ShortCodeApplicationView`, `ShortCodeApplicationInput` and `ShortCodePreflight` types. The application calls need the `short_codes:read` and `short_codes:write` scopes.
+- Webhook types: `WebhookMessageStatus` now lists every status the API emits (read, bounced, retrying, received, undelivered).
+
 ## 4.0.0
 
 ### Major Changes
 
 - Every Sendly SDK, the CLI and the MCP server now share one version. No public API was removed or changed in this package; the major aligns the fleet and carries the behaviour changes below.
-
   - **Path parameters are percent-encoded.** Every id you pass is now encoded before it goes into the request path. An id containing `/`, `?` or `#` used to change which endpoint the request reached: an id of `../../account/keys` left its collection and hit another endpoint carrying your API key. Ordinary ids are sent byte-for-byte as before.
   - **Plain HTTP is accepted only for this machine.** A `baseUrl` that is not `https://` must now be `localhost`, a `*.localhost` name, an address in `127.0.0.0/8`, or `[::1]`. The old check accepted any hostname that merely contained `localhost`, so `http://localhost.attacker.example` sent a live API key in cleartext. Any other `http://` base URL now throws when the client is constructed.
   - **The API key is no longer an enumerable property of the client.** It no longer appears in `console.log(client)`, `JSON.stringify(client)`, object spreads or error-reporter payloads.

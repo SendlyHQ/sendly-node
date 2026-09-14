@@ -17,7 +17,16 @@ export type { WebhookEventType };
 /**
  * Message status in webhook events
  */
-export type WebhookMessageStatus = "queued" | "sent" | "delivered" | "failed";
+export type WebhookMessageStatus =
+  | "queued"
+  | "sent"
+  | "delivered"
+  | "read"
+  | "failed"
+  | "bounced"
+  | "retrying"
+  | "received"
+  | "undelivered";
 
 /**
  * Message object within webhook payload
