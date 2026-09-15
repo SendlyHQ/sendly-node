@@ -1,5 +1,11 @@
 # @sendly/node
 
+## 4.2.0
+
+### Minor Changes
+
+- [#128](https://github.com/SendlyHQ/sendly/pull/128) [`59087e3`](https://github.com/SendlyHQ/sendly/commit/59087e3f32653e6bd32dc67a957cae4684eca442) Thanks [@sendly-live](https://github.com/sendly-live)! - Added voice configuration over the API: `voice.numbers.list/get/update/registerEmergencyAddress`, `voice.agents.list/create/get/update/delete` and `voice.voices.list` in the Node SDK (with the `VoiceNumber`, `VoiceAgent`, `Voice` and request types, and the new voice configuration error codes), plus the nine voice configuration tools in the MCP server.
+
 ## 4.1.0
 
 ### Minor Changes
