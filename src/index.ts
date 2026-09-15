@@ -176,6 +176,26 @@ export type {
   CallRecording,
 } from "./resources/calls";
 
+// Types - Voice configuration (numbers, agents, voices)
+export type {
+  VoiceMode,
+  VoiceNumber,
+  VoiceNumberEmergencyAddress,
+  VoiceNumberRates,
+  EmergencyAddress,
+  RegisterEmergencyAddressRequest,
+  UpdateVoiceNumberRequest,
+  VoiceNumberListResponse,
+  VoiceAgent,
+  VoiceAgentTools,
+  CreateVoiceAgentRequest,
+  UpdateVoiceAgentRequest,
+  VoiceAgentListResponse,
+  DeletedVoiceAgent,
+  Voice,
+  VoiceListResponse,
+} from "./resources/voice";
+
 // Types - Links (URL shortening)
 export type {
   CreateShortLinkRequest,

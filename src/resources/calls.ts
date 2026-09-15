@@ -10,8 +10,9 @@
  * Calls are prepaid from the workspace balance per started minute: an
  * agent-handled outbound call costs 10 credits a minute (2 for the call,
  * 8 for the agent). Unanswered calls cost nothing. Destinations are US and
- * Canadian numbers; the `from` number must be voice-enabled in the
- * dashboard (Calls → Settings) and have an emergency address registered.
+ * Canadian numbers; the `from` number must be voice-enabled and have an
+ * emergency address registered, in the dashboard (Calls → Settings) or
+ * with `sendly.voice.numbers`.
  *
  * Reads need the `calls:read` scope and writes `calls:write`. Writes need
  * a live API key and accept an optional
@@ -226,7 +227,10 @@ export interface CallRecording {
   url: string | null;
   /** When `url` stops working (ISO 8601). Non-null only when `ready`. */
   expiresAt: string | null;
-  /** `audio/ogg` when `ready`, else `null`. Agent calls are dual-channel. */
+  /**
+   * `audio/ogg` when `ready`, else `null`. Agent calls are recorded in
+   * stereo: the agent on the left channel, the other party on the right.
+   */
   contentType: string | null;
 }
 

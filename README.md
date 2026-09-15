@@ -818,9 +818,9 @@ writes need a live API key. Destinations are US and Canadian numbers.
 Calls are prepaid from your credit balance per started minute: an
 agent-handled outbound call is 10 credits a minute (2 for the call, 8 for
 the agent), and unanswered calls cost nothing. The `from` number must be
-voice-enabled in the dashboard (Calls → Settings) with an emergency address
-registered; `sendly.numbers.list()` shows `voiceEnabled` and `voiceMode`
-per number. Voice is being enabled workspace by workspace; until it is on
+voice-enabled with an emergency address registered, in the dashboard (Calls →
+Settings) or from code with [`sendly.voice.numbers`](#configure-voice);
+`sendly.numbers.list()` shows `voiceEnabled` and `voiceMode` per number. Voice is being enabled workspace by workspace; until it is on
 for yours, every call method responds `404 voice_not_enabled`.
 
 ```typescript
@@ -857,6 +857,7 @@ for (const line of current.transcript ?? []) {
 await sendly.calls.hangup(call.id);
 
 // Fetch the recording (Ogg/Opus). The signed URL is valid for five minutes.
+// Agent calls are stereo: the agent on the left channel, the other party on the right.
 const recording = await sendly.calls.recording(call.id);
 if (recording.status === 'ready') {
   console.log(recording.url, recording.expiresAt); // audio/ogg
@@ -870,6 +871,84 @@ register an emergency address first), `lines_busy` (409, retry shortly),
 minute at the agent rate throws `InsufficientCreditsError`. The
 `call.started`, `call.completed` and `call.recording.ready` webhooks carry
 the same call as a snake_case object (see [Lifecycle Events](#lifecycle-events)).
+
+### Configure voice
+
+Set up everything a call depends on from code: switch voice on for a number
+and choose how it answers, register its emergency address, and create the AI
+agents that talk. `sendly.voice` uses the same `calls:read` and `calls:write`
+scopes, and writes need a live API key. In a team workspace, changing a
+number or its emergency address needs a role that can change settings, and
+managing agents needs a role that can manage API keys (each agent holds its
+own scoped sending key); otherwise the API responds `403 forbidden`. Address
+a number by its id or its E.164 phone number.
+
+```typescript
+// Pick a voice, then create an agent
+const { data: voices } = await sendly.voice.voices.list();
+console.log(voices.map((v) => `${v.id}: ${v.label}`)); // ["ashley: Ashley (US, warm)", ...]
+
+const agent = await sendly.voice.agents.create({
+  name: 'Front desk',
+  voice: 'ashley',
+  greeting: 'Thanks for calling Acme, how can I help?',
+  instructions: 'Answer questions about opening hours and take a message for anything else.',
+  tools: { sendSms: true },
+});
+console.log(agent.id, agent.canSendSms); // "3c4d5e6f-...", true
+
+// Change only what you pass; tools keys you leave out keep their values
+await sendly.voice.agents.update(agent.id, {
+  greeting: 'Thanks for calling Acme. How can I help today?',
+});
+
+// Register the emergency address: required before a US or Canadian number
+// can place calls, and $1.50 a month
+await sendly.voice.numbers.registerEmergencyAddress('+15555550188', {
+  street: '500 Example Ave',
+  unit: 'Suite 2',
+  city: 'Austin',
+  state: 'TX',
+  zip: '78701',
+});
+
+// Switch voice on and have the agent answer real callers
+const number = await sendly.voice.numbers.update('+15555550188', {
+  voiceEnabled: true,
+  voiceMode: 'agent',
+  agentId: agent.id,
+});
+console.log(number.voiceMode, number.ratePerMinute); // "agent", { inbound: 2, outbound: 2, agent: 10 }
+
+// Ring the team in the dashboard instead, or switch voice off
+await sendly.voice.numbers.update(number.id, { voiceMode: 'ring_dashboard' });
+await sendly.voice.numbers.update(number.id, { voiceEnabled: false });
+
+// Every number and agent in the workspace
+const { data: numbers } = await sendly.voice.numbers.list();
+const { data: agents } = await sendly.voice.agents.list();
+
+// Delete an agent once no number answers with it; its sending key is revoked
+await sendly.voice.agents.delete(agent.id);
+```
+
+Sent without `voiceEnabled`, `voiceMode: 'ring_dashboard'` or `'agent'`
+switches voice on, with the same refusals as `voiceEnabled: true`, and
+`'none'` switches it off; `voiceEnabled: false` always switches voice off. An
+unknown voice id falls back to the default voice. Agents can't transfer calls yet:
+with `tools.transferTo` set, a caller who asks for a person is told the
+message will be passed on and the agent takes their name and number.
+
+Refusals: `number_not_found` and `agent_not_found` (404); `invalid_request`
+(400, thrown as `ValidationError`), `invalid_voice_mode`, `agent_required` and
+`e911_not_applicable` (400); `agent_disabled` (409, switch the agent on
+first); `agent_limit` (409, 20 agents per workspace); `agent_in_use` (409,
+`error.response.numbers` lists the numbers the agent still answers);
+`invalid_address` (400 for a missing or malformed field, 422 when the address
+couldn't be validated, with a corrected one in `error.response.suggested`
+when found); `voice_attach_failed` (502, try again); `carrier_refused` (502,
+try again, unless the message says the number couldn't be found for emergency
+registration: contact support); and `voice_unavailable` (503).
 
 ## Error Handling
 
@@ -1025,6 +1104,7 @@ new Sendly(config: SendlyConfig)
 - `webhooks` - Webhooks resource
 - `account` - Account resource
 - `calls` - Voice calls resource
+- `voice` - Voice configuration resource (numbers, agents, voices)
 
 #### Methods
 
@@ -1158,7 +1238,49 @@ End a call. Ringing becomes `cancelled`, active becomes `completed`; an ended ca
 
 #### `recording(id: string): Promise<CallRecording>`
 
-Fetch a call's recording status and, when `ready`, a signed `url` valid for five minutes.
+Fetch a call's recording status and, when `ready`, a signed `url` valid for five minutes. Agent calls are stereo: the agent on the left channel, the other party on the right.
+
+### `sendly.voice`
+
+#### `numbers.list(): Promise<VoiceNumberListResponse>`
+
+List the workspace's active numbers with their voice settings, in the same order as the dashboard.
+
+#### `numbers.get(number: string): Promise<VoiceNumber>`
+
+Retrieve a number's voice settings by its id or E.164 phone number.
+
+#### `numbers.update(number: string, request: UpdateVoiceNumberRequest, options?: IdempotentRequestOptions): Promise<VoiceNumber>`
+
+Change `voiceEnabled`, `voiceMode` (`none`, `ring_dashboard` or `agent`) and `agentId`. Requires `calls:write` and a live key; turning voice on connects the number for calls, and `ring_dashboard` or `agent` sent without `voiceEnabled` turns it on.
+
+#### `numbers.registerEmergencyAddress(number: string, request: RegisterEmergencyAddressRequest, options?: IdempotentRequestOptions): Promise<VoiceNumber>`
+
+Register the number's emergency address (`street`, `unit`, `city`, `state`, `zip`, `country` defaulting to `US`). Required before a US or Canadian number places calls; $1.50 a month.
+
+#### `agents.list(): Promise<VoiceAgentListResponse>`
+
+List the workspace's AI agents with their call stats.
+
+#### `agents.create(request: CreateVoiceAgentRequest, options?: IdempotentRequestOptions): Promise<VoiceAgent>`
+
+Create an agent (up to 20 per workspace). Each agent gets its own scoped sending key.
+
+#### `agents.get(id: string): Promise<VoiceAgent>`
+
+Retrieve an agent.
+
+#### `agents.update(id: string, request: UpdateVoiceAgentRequest, options?: IdempotentRequestOptions): Promise<VoiceAgent>`
+
+Change any subset of the create fields; `tools` keys you leave out keep their values.
+
+#### `agents.delete(id: string, options?: IdempotentRequestOptions): Promise<DeletedVoiceAgent>`
+
+Delete an agent and revoke its sending key. Refused with `409 agent_in_use` while a number answers with it.
+
+#### `voices.list(): Promise<VoiceListResponse>`
+
+List the voices an agent can speak with.
 
 ## Enterprise
 

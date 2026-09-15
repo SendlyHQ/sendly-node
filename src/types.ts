@@ -1821,6 +1821,14 @@ export type SendlyErrorCode =
   | "lines_busy"
   | "daily_call_limit"
   | "call_not_found"
+  | "invalid_voice_mode"
+  | "agent_limit"
+  | "agent_in_use"
+  | "invalid_address"
+  | "e911_not_applicable"
+  | "voice_attach_failed"
+  | "carrier_refused"
+  | "voice_unavailable"
   | "live_key_required"
   | "voice_internal_error"
   | "forbidden"
@@ -2205,9 +2213,11 @@ export interface WebhookEventData {
   created_at?: number | string;
   retry_count?: number;
   metadata?: Record<string, any>;
-  message_format?: "sms" | "mms";
+  message_format?: "sms" | "mms" | "whatsapp" | "rcs";
   media_urls?: string[];
   batch_id?: string | null;
+  /** When the recipient read the message (Unix seconds), on read receipts */
+  read_at?: number | string;
 }
 
 /**

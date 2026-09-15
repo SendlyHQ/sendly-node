@@ -26,6 +26,7 @@ import { WhatsAppResource } from "./resources/whatsapp";
 import { RcsResource } from "./resources/rcs";
 import { ShortCodesResource } from "./resources/shortCodes";
 import { CallsResource } from "./resources/calls";
+import { VoiceResource } from "./resources/voice";
 
 const DEFAULT_BASE_URL = "https://sendly.live/api/v1";
 const DEFAULT_TIMEOUT = 30000;
@@ -455,7 +456,8 @@ export class Sendly {
    * ends, hang up early, and fetch the recording. Calls are prepaid per
    * started minute (an agent-handled outbound call is 10 credits a minute);
    * unanswered calls cost nothing. The `from` number must be voice-enabled
-   * in the dashboard, and writes need a live API key.
+   * (in the dashboard or with {@link Sendly.voice}), and writes need a live
+   * API key.
    *
    * @example
    * ```typescript
@@ -486,6 +488,51 @@ export class Sendly {
    * ```
    */
   public readonly calls: CallsResource;
+
+  /**
+   * Voice API resource - configure numbers, AI agents and voices for phone
+   * calls.
+   *
+   * Switch voice on for a number and choose how it answers (ring the team
+   * in the dashboard, or have an AI agent answer real callers), register
+   * the number's emergency address, and create, update and delete the
+   * agents that talk on calls. Uses the `calls:read` and `calls:write`
+   * scopes; writes need a live API key. A number is addressed by its id or
+   * its E.164 phone number.
+   *
+   * @example
+   * ```typescript
+   * // Create an agent with one of the available voices
+   * const { data: voices } = await sendly.voice.voices.list();
+   * const agent = await sendly.voice.agents.create({
+   *   name: 'Front desk',
+   *   voice: voices[0].id,
+   *   greeting: 'Thanks for calling Acme, how can I help?',
+   *   instructions: 'Answer questions about opening hours and take a message for anything else.',
+   * });
+   *
+   * // Register the emergency address ($1.50 a month, required before the number places calls)
+   * await sendly.voice.numbers.registerEmergencyAddress('+15555550188', {
+   *   street: '500 Example Ave',
+   *   city: 'Austin',
+   *   state: 'TX',
+   *   zip: '78701',
+   * });
+   *
+   * // Have the agent answer the number
+   * const number = await sendly.voice.numbers.update('+15555550188', {
+   *   voiceEnabled: true,
+   *   voiceMode: 'agent',
+   *   agentId: agent.id,
+   * });
+   * console.log(number.voiceMode, number.ratePerMinute.agent); // "agent", 10
+   *
+   * // Hand the number back to the team, then delete the agent
+   * await sendly.voice.numbers.update(number.id, { voiceMode: 'ring_dashboard' });
+   * await sendly.voice.agents.delete(agent.id);
+   * ```
+   */
+  public readonly voice: VoiceResource;
 
   private readonly http: HttpClient;
   private readonly config: Required<Pick<SendlyConfig, "apiKey" | "baseUrl" | "timeout" | "maxRetries">> & Pick<SendlyConfig, "organizationId">;
@@ -553,6 +600,7 @@ export class Sendly {
     this.rcs = new RcsResource(this.http);
     this.shortCodes = new ShortCodesResource(this.http);
     this.calls = new CallsResource(this.http);
+    this.voice = new VoiceResource(this.http);
   }
 
   /**
