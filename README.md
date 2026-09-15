@@ -724,10 +724,11 @@ await sendly.rcs.agents.setTestDevices(agent.id, [
 ]);
 await sendly.rcs.agents.update(agent.id, {
   campaign: {
+    companyOverview: 'Acme Coffee runs 12 cafes and an online store.',
     agentOverview: 'Order confirmations, pickup alerts, and support replies',
     interactions: [{ interactionType: 'TRANSACTIONAL_UPDATES', description: 'Order status' }],
     messageExamples: [
-      'Your order #4821 is being roasted.',
+      'Acme Coffee: order #4821 is being roasted. Reply STOP to opt out.',
       'Your order #4821 is ready for pickup!',
       'Thanks for visiting - reply HELP for support.',
     ],
@@ -735,6 +736,8 @@ await sendly.rcs.agents.update(agent.id, {
       optInMethods: [{ methodType: 'WEBSITE', description: 'Checkout checkbox' }],
       callToAction: 'Text me order updates',
       callToActionUrl: 'https://acme.example/checkout',
+      callToActionMediaUrl: 'https://acme.example/rcs/opt-in.png',
+      doubleOptIn: false,
       optInMessage: 'Welcome to Acme Coffee updates. Reply STOP to opt out.',
       helpResponse: 'Acme Coffee: email help@acme.example for support.',
       optOutResponse: 'You have been unsubscribed from Acme Coffee updates.',
