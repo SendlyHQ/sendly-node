@@ -51,7 +51,7 @@ export type WhatsAppSignupStatus =
 export interface StartWhatsAppSignupRequest {
   /**
    * The number to connect, in E.164 format. Must be an active number in
-   * your workspace (provisioned, purchased, or ported into Sendly).
+   * your workspace (provisioned, purchased, or fully ported into Sendly).
    */
   phoneNumber: string;
 }
