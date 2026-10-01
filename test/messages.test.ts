@@ -837,4 +837,50 @@ describe("Messages Resource", () => {
       }, 40000);
     });
   });
+  describe("sendGroup()", () => {
+    it("lists the numbers in to and the per-recipient statuses in recipients on a live send", async () => {
+      fetchMock.mockResolvedValueOnce(
+        mockFetchResponse({
+          id: "msg_grp1",
+          status: "sent",
+          to: [
+            { phoneNumber: "+14155551234", status: "queued" },
+            { phoneNumber: "+14155555678", status: "sent" },
+          ],
+          group_message_id: "grp_1",
+        }),
+      );
+
+      const result = await client.messages.sendGroup({
+        to: ["+14155551234", "+14155555678"],
+        text: "Team sync at noon",
+      });
+
+      expect(result.to).toEqual(["+14155551234", "+14155555678"]);
+      expect(result.recipients).toEqual([
+        { phoneNumber: "+14155551234", status: "queued" },
+        { phoneNumber: "+14155555678", status: "sent" },
+      ]);
+      expect(result.group_message_id).toBe("grp_1");
+    });
+
+    it("keeps the numbers of a simulated send unchanged", async () => {
+      const body = {
+        id: "msg_grp2",
+        status: "delivered",
+        to: ["+14155551234", "+14155555678"],
+        simulated: true,
+        message: "Group message simulated (test key or verification pending).",
+      };
+      fetchMock.mockResolvedValueOnce(mockFetchResponse(body));
+
+      const result = await client.messages.sendGroup({
+        to: ["+14155551234", "+14155555678"],
+        text: "Team sync at noon",
+      });
+
+      expect(result).toEqual(body);
+      expect(result.recipients).toBeUndefined();
+    });
+  });
 });

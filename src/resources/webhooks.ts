@@ -5,6 +5,7 @@
 
 import type { HttpClient } from "../utils/http";
 import { transformKeys } from "../utils/transform";
+import { ValidationError } from "../errors";
 import type {
   Webhook,
   WebhookCreatedResponse,
@@ -14,6 +15,8 @@ import type {
   WebhookTestResult,
   WebhookSecretRotation,
   WebhookEventType,
+  WebhookEventTypeDetail,
+  DeliveryStatus,
   WebhookRedeliverOptions,
   WebhookRedeliverResult,
   WebhookBackfillOptions,
@@ -72,13 +75,12 @@ export class WebhooksResource {
    * @throws {AuthenticationError} If the API key is invalid
    */
   async create(options: CreateWebhookOptions): Promise<WebhookCreatedResponse> {
-    // Basic validation
     if (!options.url || !options.url.startsWith("https://")) {
-      throw new Error("Webhook URL must be HTTPS");
+      throw new ValidationError("Webhook URL must be HTTPS");
     }
 
     if (!options.events || options.events.length === 0) {
-      throw new Error("At least one event type is required");
+      throw new ValidationError("At least one event type is required");
     }
 
     const response = await this.http.request<unknown>({
@@ -178,7 +180,7 @@ export class WebhooksResource {
     }
 
     if (options.url && !options.url.startsWith("https://")) {
-      throw new Error("Webhook URL must be HTTPS");
+      throw new ValidationError("Webhook URL must be HTTPS");
     }
 
     const response = await this.http.request<unknown>({
@@ -226,17 +228,20 @@ export class WebhooksResource {
   /**
    * Send a test event to a webhook endpoint
    *
+   * Resolves when your endpoint accepted the test event. When it did not
+   * (an error status, a timeout, or no answer), the call throws a
+   * {@link ValidationError} whose message says why.
+   *
    * @param id - Webhook ID
    * @returns Test result with response details
    *
    * @example
    * ```typescript
-   * const result = await sendly.webhooks.test('whk_xxx');
-   *
-   * if (result.success) {
+   * try {
+   *   const result = await sendly.webhooks.test('whk_xxx');
    *   console.log(`Test passed! Response time: ${result.responseTimeMs}ms`);
-   * } else {
-   *   console.log(`Test failed: ${result.error}`);
+   * } catch (err) {
+   *   console.log(`Test failed: ${(err as Error).message}`);
    * }
    * ```
    */
@@ -251,7 +256,13 @@ export class WebhooksResource {
     });
 
     // Transform snake_case API response to camelCase SDK types
-    return transformKeys<WebhookTestResult>(response);
+    const result = transformKeys<WebhookTestResult>(response);
+    return {
+      ...result,
+      statusCode: result.statusCode ?? result.delivery?.statusCode,
+      responseTimeMs: result.responseTimeMs ?? result.delivery?.responseTime,
+      error: result.error ?? result.delivery?.error,
+    };
   }
 
   /**
@@ -341,8 +352,9 @@ export class WebhooksResource {
    * for any message whose `message.sent` / `message.delivered` /
    * `message.failed` event has not been successfully delivered yet.
    *
-   * Synthesized events have fresh IDs — your endpoint should dedupe by
-   * `event.data.object.id` (the message ID).
+   * Synthesized message events carry the same event id the original
+   * dispatch used, so dedupe on `event.id`. Do not dedupe on
+   * `event.data.object.id`: a message's sent and delivered events share it.
    *
    * Rejects with HTTP 409 if the circuit is currently open — call
    * {@link WebhooksResource.resetCircuit} first.
@@ -386,10 +398,12 @@ export class WebhooksResource {
   /**
    * Rotate the webhook signing secret
    *
-   * The old secret remains valid for 24 hours to allow for graceful migration.
+   * Deliveries are signed with the new secret as soon as this returns, so
+   * have your endpoint accept both the old and the new secret until the new
+   * one is deployed.
    *
    * @param id - Webhook ID
-   * @returns New secret and expiration info
+   * @returns The new secret (shown only once) and when it was rotated
    *
    * @example
    * ```typescript
@@ -397,7 +411,7 @@ export class WebhooksResource {
    *
    * // Update your webhook handler with the new secret
    * console.log('New secret:', rotation.newSecret);
-   * console.log('Old secret expires:', rotation.oldSecretExpiresAt);
+   * console.log('Rotated at:', rotation.rotatedAt);
    * ```
    */
   async rotateSecret(id: string): Promise<WebhookSecretRotation> {
@@ -415,9 +429,10 @@ export class WebhooksResource {
   }
 
   /**
-   * Get delivery history for a webhook
+   * Get delivery history for a webhook, newest first
    *
    * @param id - Webhook ID
+   * @param options - Pagination (`limit`, `offset`) and a delivery `status` to filter by
    * @returns Array of delivery attempts
    *
    * @example
@@ -427,20 +442,37 @@ export class WebhooksResource {
    * for (const delivery of deliveries) {
    *   console.log(`${delivery.eventType}: ${delivery.status} (${delivery.responseTimeMs}ms)`);
    * }
+   *
+   * // Failed deliveries only, second page of 50
+   * const failed = await sendly.webhooks.getDeliveries('whk_xxx', {
+   *   status: 'failed',
+   *   limit: 50,
+   *   offset: 50,
+   * });
    * ```
    */
-  async getDeliveries(id: string): Promise<WebhookDelivery[]> {
+  async getDeliveries(
+    id: string,
+    options?: { limit?: number; offset?: number; status?: DeliveryStatus },
+  ): Promise<WebhookDelivery[]> {
     if (!id || !id.startsWith("whk_")) {
       throw new Error("Invalid webhook ID format");
     }
 
-    const response = await this.http.request<unknown[]>({
+    const response = await this.http.request<{ deliveries?: unknown[] }>({
       method: "GET",
       path: `/webhooks/${encodeURIComponent(id)}/deliveries`,
+      query: {
+        limit: options?.limit,
+        offset: options?.offset,
+        status: options?.status,
+      },
     });
 
     // Transform snake_case API response to camelCase SDK types
-    return response.map((item) => transformKeys<WebhookDelivery>(item));
+    return (response.deliveries ?? []).map((item) =>
+      transformKeys<WebhookDelivery>(item),
+    );
   }
 
   /**
@@ -478,15 +510,36 @@ export class WebhooksResource {
    * ```typescript
    * const eventTypes = await sendly.webhooks.listEventTypes();
    * console.log('Available events:', eventTypes);
-   * // ['message.sent', 'message.delivered', 'message.failed', 'message.bounced']
+   * // ['message.sent', 'message.delivered', 'message.failed', ...]
    * ```
    */
   async listEventTypes(): Promise<WebhookEventType[]> {
-    const eventTypes = await this.http.request<WebhookEventType[]>({
+    const details = await this.listEventTypeDetails();
+
+    return details.map((event) => event.type);
+  }
+
+  /**
+   * List available event types with a description of each
+   *
+   * @returns Each event type and what it reports
+   *
+   * @example
+   * ```typescript
+   * const events = await sendly.webhooks.listEventTypeDetails();
+   * for (const { type, description } of events) {
+   *   console.log(`${type}: ${description}`);
+   * }
+   * ```
+   */
+  async listEventTypeDetails(): Promise<WebhookEventTypeDetail[]> {
+    const response = await this.http.request<{
+      events?: WebhookEventTypeDetail[];
+    }>({
       method: "GET",
       path: "/webhooks/event-types",
     });
 
-    return eventTypes;
+    return response.events ?? [];
   }
 }

@@ -49,6 +49,13 @@ export type CallDirection = "inbound" | "outbound";
 /** `pstn` is a phone call; `internal` is browser-to-browser between teammates. */
 export type CallKind = "pstn" | "internal";
 
+/**
+ * How the far end reached the call: `phone` (the phone network),
+ * `whatsapp` (a WhatsApp call) or `browser` (an in-app call). Other values
+ * may be added.
+ */
+export type CallChannel = "phone" | "whatsapp" | "browser" | (string & {});
+
 /** Who answered: an AI agent or the team in the dashboard. */
 export type CallHandledBy = "agent" | "dashboard";
 
@@ -85,6 +92,11 @@ export interface Call {
   object: "call";
   /** `pstn` (a phone call) or `internal` (browser-to-browser) */
   kind: CallKind;
+  /**
+   * `phone`, `whatsapp` or `browser`. An inbound WhatsApp call can read
+   * `phone` until the carrier labels it.
+   */
+  channel?: CallChannel;
   /** `inbound` or `outbound` */
   direction: CallDirection;
   /** Lifecycle status */

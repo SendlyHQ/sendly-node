@@ -126,10 +126,16 @@ export interface EinDocumentInput {
 export interface StartUpgradeResponse {
   success: true;
   pendingVerificationId: string;
-  telnyxVerificationId: string;
-  tollFreeNumber: string;
-  telnyxMessagingProfileId: string;
-  einDocStored: boolean;
+  /** Always "provisioning": the new number and verification are set up in the background */
+  status?: "provisioning";
+  /** @deprecated Not returned; poll {@link BusinessUpgradeResource.status} */
+  telnyxVerificationId?: string;
+  /** @deprecated Not returned; poll {@link BusinessUpgradeResource.status} */
+  tollFreeNumber?: string;
+  /** @deprecated Not returned; always undefined */
+  telnyxMessagingProfileId?: string;
+  /** @deprecated Not returned; always undefined */
+  einDocStored?: boolean;
   message: string;
 }
 
@@ -244,7 +250,9 @@ export class BusinessUpgradeResource {
   /**
    * Start an entity upgrade for the given workspace. Auto-provisions
    * a new toll-free number + messaging profile and submits to the
-   * carrier for review. Returns the pending verification details.
+   * carrier for review. That happens in the background: the call returns
+   * the pending verification's id with status `provisioning`, and
+   * {@link BusinessUpgradeResource.status} reports its progress.
    *
    * The current toll-free number continues sending throughout the
    * 1-2 week carrier review; on approval, an atomic swap promotes

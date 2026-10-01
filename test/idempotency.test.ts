@@ -1,5 +1,5 @@
 /**
- * Tests for automatic idempotency keys - generation, retry reuse, rotation
+ * Tests for automatic idempotency keys - generation and retry reuse
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
@@ -143,7 +143,7 @@ describe("Idempotency keys", () => {
       expect(keyOfCall(fetchMock, 0)).toEqual(keyOfCall(fetchMock, 1));
     });
 
-    it("should rotate the auto-generated key when retrying after a 5xx response", async () => {
+    it("should keep the auto-generated key when retrying after a 5xx response, which the API never records", async () => {
       fetchMock
         .mockResolvedValueOnce(
           mockFetchResponse(
@@ -163,11 +163,10 @@ describe("Idempotency keys", () => {
       const first = keyOfCall(fetchMock, 0);
       const second = keyOfCall(fetchMock, 1);
       expect(first).toBeDefined();
-      expect(second).toBeDefined();
-      expect(first).not.toEqual(second);
+      expect(second).toEqual(first);
     });
 
-    it("should keep the rotated key across a subsequent timeout (5xx then timeout)", async () => {
+    it("should keep one key across a 5xx and then a timeout", async () => {
       const abortError = new Error("The operation was aborted");
       abortError.name = "AbortError";
       fetchMock
@@ -190,16 +189,16 @@ describe("Idempotency keys", () => {
       const first = keyOfCall(fetchMock, 0);
       const second = keyOfCall(fetchMock, 1);
       const third = keyOfCall(fetchMock, 2);
-      expect(second).not.toEqual(first);
-      expect(third).toEqual(second);
+      expect(second).toEqual(first);
+      expect(third).toEqual(first);
     });
 
     it("should keep the key when retrying a non-5xx HTTP error", async () => {
       fetchMock
         .mockResolvedValueOnce(
           mockFetchResponse(
-            { error: "conflict", message: "Resource busy" },
-            409,
+            { error: "request_timeout", message: "Request timed out" },
+            408,
           ),
         )
         .mockResolvedValueOnce(mockFetchResponse(mockMessage));
@@ -214,7 +213,7 @@ describe("Idempotency keys", () => {
       expect(keyOfCall(fetchMock, 0)).toEqual(keyOfCall(fetchMock, 1));
     });
 
-    it("should rotate the auto key on 5xx for media uploads too", async () => {
+    it("should keep the auto key on 5xx for media uploads too", async () => {
       fetchMock
         .mockResolvedValueOnce(
           mockFetchResponse(
@@ -232,8 +231,7 @@ describe("Idempotency keys", () => {
       const first = keyOfCall(fetchMock, 0);
       const second = keyOfCall(fetchMock, 1);
       expect(first).toMatch(/^sendly-node-retry-/);
-      expect(second).toMatch(/^sendly-node-retry-/);
-      expect(first).not.toEqual(second);
+      expect(second).toEqual(first);
     });
   });
 

@@ -12,6 +12,7 @@ import type {
   RcsMessage,
   SendGroupMessageRequest,
   GroupMessageResponse,
+  GroupRecipient,
   EnhanceMessageRequest,
   EnhanceMessageResponse,
   Message,
@@ -24,11 +25,14 @@ import type {
   CancelledMessageResponse,
   BatchMessageRequest,
   BatchMessageResponse,
+  BatchSendResponse,
+  BatchSummary,
   BatchPreviewResponse,
   ListBatchesOptions,
   BatchListResponse,
   IdempotentRequestOptions,
 } from "../types";
+import { MAX_BATCH_MESSAGES } from "../types";
 import {
   validatePhoneNumber,
   validateMessageText,
@@ -36,6 +40,24 @@ import {
   validateLimit,
   validateMessageId,
 } from "../utils/validation";
+
+type WireMessage = Message & {
+  message_format?: Message["messageFormat"];
+  media_urls?: string[];
+  batch_id?: string | null;
+};
+
+function toMessage(raw: WireMessage): Message {
+  return {
+    ...raw,
+    ...(raw.messageFormat === undefined &&
+      raw.message_format !== undefined && { messageFormat: raw.message_format }),
+    ...(raw.mediaUrls === undefined &&
+      raw.media_urls !== undefined && { mediaUrls: raw.media_urls }),
+    ...(raw.batchId === undefined &&
+      raw.batch_id !== undefined && { batchId: raw.batch_id }),
+  };
+}
 
 /**
  * Messages API resource
@@ -65,8 +87,11 @@ export class MessagesResource {
   /**
    * Send a WhatsApp message
    *
-   * Requires a live API key and a `from` number with an active WhatsApp
-   * connection (see `sendly.whatsapp.signup`). Free-form `text` and media
+   * Requires the `sms:send` scope (not `whatsapp:write`), a live API key
+   * and a `from` number with an active WhatsApp connection (see
+   * `sendly.whatsapp.signup`). WhatsApp is enabled per person (the user
+   * who owns the API key, not the workspace); while it is off the API
+   * responds 403 `whatsapp_not_enabled`. Free-form `text` and media
    * only deliver inside an open 24-hour customer-service window — outside
    * it, send an approved `template` instead (check with
    * `sendly.whatsapp.window()`).
@@ -104,6 +129,9 @@ export class MessagesResource {
    * @throws {InsufficientCreditsError} If credit balance is too low
    * @throws {AuthenticationError} If the API key is invalid
    * @throws {RateLimitError} If rate limit is exceeded
+   * @throws {SendlyError} `whatsapp_send_failed`: 422 when WhatsApp refused the message, which is final and not retried (the response is cached under the idempotency key and replayed for 24 hours); 502 when the message provably never reached the carrier, so it was not sent and is safe to send again. A 502 is never cached, so the SDK retries it like any 5xx under the same idempotency key. Either way the message wasn't charged. No send returns 503 `whatsapp_unavailable`.
+   * @throws {SendlyError} `whatsapp_send_unconfirmed` (409) when the outcome is unknown: the message was marked failed and refunded, but it may still be delivered, so check before sending it again (it could arrive twice). It is cached under the idempotency key and not retried automatically.
+   * @throws {SendlyError} `whatsapp_not_enabled` (403) when WhatsApp isn't enabled for the key's owner, or `whatsapp_requires_live_key` (403) with a test key
    */
   async send(
     request: SendWhatsAppMessageRequest,
@@ -266,7 +294,7 @@ export class MessagesResource {
     }
 
     // Make API request
-    const message = await this.http.request<Message>({
+    const message = await this.http.request<WireMessage>({
       method: "POST",
       path: "/messages",
       idempotencyKey: options?.idempotencyKey,
@@ -280,7 +308,7 @@ export class MessagesResource {
       },
     });
 
-    return message;
+    return toMessage(message);
   }
 
   /**
@@ -331,7 +359,9 @@ export class MessagesResource {
       validateSenderId(request.from);
     }
 
-    const response = await this.http.request<GroupMessageResponse>({
+    const response = await this.http.request<
+      Omit<GroupMessageResponse, "to"> & { to: Array<string | GroupRecipient> }
+    >({
       method: "POST",
       path: "/messages/group",
       idempotencyKey: options?.idempotencyKey,
@@ -344,7 +374,20 @@ export class MessagesResource {
       },
     });
 
-    return response;
+    if (!Array.isArray(response.to)) {
+      return response as GroupMessageResponse;
+    }
+    const recipients = response.to.filter(
+      (r): r is GroupRecipient => typeof r === "object" && r !== null,
+    );
+    if (recipients.length === 0) {
+      return response as GroupMessageResponse;
+    }
+    return {
+      ...response,
+      to: response.to.map((r) => (typeof r === "string" ? r : r.phoneNumber)),
+      recipients: response.recipients ?? recipients,
+    };
   }
 
   /**
@@ -434,7 +477,7 @@ export class MessagesResource {
       },
     });
 
-    return response;
+    return { ...response, data: response.data.map(toMessage) };
   }
 
   /**
@@ -460,18 +503,19 @@ export class MessagesResource {
     validateMessageId(id);
 
     // Make API request
-    const message = await this.http.request<Message>({
+    const message = await this.http.request<WireMessage>({
       method: "GET",
       path: `/messages/${encodeURIComponent(id)}`,
     });
 
-    return message;
+    return toMessage(message);
   }
 
   /**
    * Iterate through all messages with automatic pagination
    *
-   * @param options - List options (limit is used as batch size)
+   * @param options - List options: `limit` is the page size, `offset` where
+   *   to start, and `status` filters every page
    * @yields Message objects one at a time
    *
    * @example
@@ -481,8 +525,8 @@ export class MessagesResource {
    *   console.log(`${message.id}: ${message.status}`);
    * }
    *
-   * // With custom batch size
-   * for await (const message of sendly.messages.listAll({ limit: 100 })) {
+   * // Only failed messages, 100 per request
+   * for await (const message of sendly.messages.listAll({ status: 'failed', limit: 100 })) {
    *   console.log(message.to);
    * }
    * ```
@@ -492,7 +536,7 @@ export class MessagesResource {
    */
   async *listAll(options: ListMessagesOptions = {}): AsyncGenerator<Message> {
     const batchSize = Math.min(options.limit || 100, 100);
-    let offset = 0;
+    let offset = options.offset ?? 0;
     let hasMore = true;
 
     while (hasMore) {
@@ -502,19 +546,18 @@ export class MessagesResource {
         query: {
           limit: batchSize,
           offset,
+          status: options.status,
         },
       });
 
       for (const message of response.data) {
-        yield message;
+        yield toMessage(message);
       }
 
-      // Check if there are more messages
-      if (response.data.length < batchSize) {
-        hasMore = false;
-      } else {
-        offset += batchSize;
-      }
+      offset += response.data.length;
+      hasMore =
+        response.data.length > 0 &&
+        (response.pagination?.hasMore ?? response.data.length >= batchSize);
     }
   }
 
@@ -680,10 +723,11 @@ export class MessagesResource {
   // ==========================================================================
 
   /**
-   * Send multiple SMS messages in a single batch
+   * Send multiple SMS messages in a single batch (up to 10,000)
    *
    * @param request - Batch request with array of messages
-   * @returns Batch response with individual message results
+   * @returns The batch. It may still be `processing`, with no message
+   *   results yet; {@link MessagesResource.getBatch} returns the outcome.
    *
    * @example
    * ```typescript
@@ -695,8 +739,11 @@ export class MessagesResource {
    * });
    *
    * console.log(batch.batchId);     // batch_xxx
-   * console.log(batch.queued);      // 2
-   * console.log(batch.creditsUsed); // 2
+   * console.log(batch.status);      // 'processing', or the outcome if it already finished
+   * console.log(batch.total);       // 2
+   *
+   * // Poll for the outcome
+   * const result = await sendly.messages.getBatch(batch.batchId);
    * ```
    *
    * @throws {ValidationError} If any message is invalid
@@ -705,7 +752,7 @@ export class MessagesResource {
   async sendBatch(
     request: BatchMessageRequest,
     options?: IdempotentRequestOptions,
-  ): Promise<BatchMessageResponse> {
+  ): Promise<BatchSendResponse> {
     // Validate all messages
     if (
       !request.messages ||
@@ -715,8 +762,10 @@ export class MessagesResource {
       throw new Error("messages must be a non-empty array");
     }
 
-    if (request.messages.length > 1000) {
-      throw new Error("Maximum 1000 messages per batch");
+    if (request.messages.length > MAX_BATCH_MESSAGES) {
+      throw new Error(
+        `Maximum ${MAX_BATCH_MESSAGES.toLocaleString("en-US")} messages per batch`,
+      );
     }
 
     for (const msg of request.messages) {
@@ -731,7 +780,7 @@ export class MessagesResource {
     // The batch endpoint dedupes header-less retries server-side by hashing
     // the request content; an auto-generated key would bypass that net for
     // identical cross-process re-runs, so only caller-supplied keys are sent.
-    const batch = await this.http.request<BatchMessageResponse>({
+    const batch = await this.http.request<BatchSendResponse>({
       method: "POST",
       path: "/messages/batch",
       idempotencyKey: options?.idempotencyKey,
@@ -772,7 +821,7 @@ export class MessagesResource {
       path: `/messages/batch/${encodeURIComponent(batchId)}`,
     });
 
-    return batch;
+    return { ...batch, batchId: batch.batchId ?? batch.id };
   }
 
   /**
@@ -805,11 +854,20 @@ export class MessagesResource {
       },
     });
 
-    return response;
+    return {
+      ...response,
+      data: response.data.map(
+        (batch): BatchSummary => ({ ...batch, batchId: batch.batchId ?? batch.id }),
+      ),
+    };
   }
 
   /**
    * Preview a batch without sending (dry run)
+   *
+   * A live send skips recipients who opted out, but rejects the whole batch
+   * if any other message is blocked, so check `canSend` rather than
+   * `sendable`.
    *
    * @param request - Batch request with array of messages
    * @returns Preview showing what would happen if batch was sent
@@ -823,9 +881,13 @@ export class MessagesResource {
    *   ]
    * });
    *
-   * console.log(preview.canSend);        // true/false
-   * console.log(preview.creditsNeeded);  // 2
-   * console.log(preview.hasEnoughCredits); // true/false
+   * console.log(preview.sendable);      // 2
+   * console.log(preview.creditsNeeded); // 4
+   * console.log(preview.canSend);       // true when nothing found stops the send
+   *
+   * for (const blocked of preview.blockedMessages ?? []) {
+   *   console.log(`${blocked.to}: ${blocked.reason}`);
+   * }
    * ```
    *
    * @throws {ValidationError} If any message is invalid
@@ -842,8 +904,10 @@ export class MessagesResource {
       throw new Error("messages must be a non-empty array");
     }
 
-    if (request.messages.length > 1000) {
-      throw new Error("Maximum 1000 messages per batch");
+    if (request.messages.length > MAX_BATCH_MESSAGES) {
+      throw new Error(
+        `Maximum ${MAX_BATCH_MESSAGES.toLocaleString("en-US")} messages per batch`,
+      );
     }
 
     for (const msg of request.messages) {
@@ -855,7 +919,15 @@ export class MessagesResource {
       validateSenderId(request.from);
     }
 
-    const preview = await this.http.request<BatchPreviewResponse>({
+    const preview = await this.http.request<
+      BatchPreviewResponse & {
+        total: number;
+        sendable: number;
+        creditBalance: number;
+        hasSufficientCredits: boolean;
+        hasWriteScope: boolean;
+      }
+    >({
       method: "POST",
       path: "/messages/batch/preview",
       body: {
@@ -865,6 +937,17 @@ export class MessagesResource {
       },
     });
 
-    return preview;
+    return {
+      ...preview,
+      totalMessages: preview.total,
+      willSend: preview.sendable,
+      currentBalance: preview.creditBalance,
+      hasEnoughCredits: preview.hasSufficientCredits,
+      canSend:
+        preview.sendable > 0 &&
+        preview.blocked === (preview.compliance?.optedOutBlocked ?? 0) &&
+        (preview.keyType === "test" || preview.hasSufficientCredits) &&
+        preview.hasWriteScope,
+    };
   }
 }

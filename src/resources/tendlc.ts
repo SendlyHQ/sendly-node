@@ -10,7 +10,8 @@
  *    {@link TenDlcResource.getBrand} until it becomes `verified` (or
  *    `failed`, with `failureReasons` explaining why).
  * 2. **Campaign** — describe your messaging use case under a verified
- *    brand and submit it for carrier review. Starts `pending`; poll
+ *    brand and submit it for carrier review. Starts `pending`, or
+ *    `awaiting_review` while Sendly reviews it first; poll
  *    {@link TenDlcResource.getCampaign} until it becomes `active`.
  *    {@link TenDlcResource.qualify} pre-checks a use case before you
  *    create the campaign.
@@ -29,11 +30,20 @@ import type { HttpClient } from "../utils/http";
 /**
  * Carrier-review status of a brand.
  *
+ * - `awaiting_review` — held for review by Sendly before it goes to the carriers.
+ * - `changes_requested` — Sendly asked for changes before submitting it.
+ * - `provisioning` — approved by Sendly and being registered with the carriers.
  * - `pending` — submitted, awaiting carrier review.
  * - `verified` — approved; campaigns can be created under this brand.
  * - `failed` — rejected; see `failureReasons`.
  */
-export type TenDlcBrandStatus = "pending" | "verified" | "failed";
+export type TenDlcBrandStatus =
+  | "pending"
+  | "verified"
+  | "failed"
+  | "awaiting_review"
+  | "changes_requested"
+  | "provisioning";
 
 /**
  * A business identity registered for carrier review.
@@ -57,6 +67,21 @@ export interface TenDlcBrand {
   status: TenDlcBrandStatus;
   /** Identity-verification detail from the carrier review, when available */
   identityStatus: string | null;
+  /** Status of the one-time code sent to a sole proprietor's mobile number */
+  smsOtpStatus?: string | null;
+  /** Last four digits of the brand's mobile number */
+  mobileLast4?: string | null;
+  /** Enhanced vetting of the brand. Always `null` over the API. */
+  vetting?: {
+    status: string;
+    score: number | null;
+    orderedAt: string | null;
+  } | null;
+  /** The uploaded EIN document. Always `null` over the API. */
+  einDocument?: {
+    filename: string;
+    uploadedAt: string | null;
+  } | null;
   /** Why the review failed, when `status` is "failed" */
   failureReasons: string[] | null;
   /** When the brand was created (ISO 8601) */
@@ -155,6 +180,8 @@ export interface TenDlcQualifyResponse {
 /**
  * Carrier-review status of a campaign.
  *
+ * - `awaiting_review` — held for review by Sendly before it goes to the carriers.
+ * - `changes_requested` — Sendly asked for changes; see `reviewNote`.
  * - `pending` — submitted, awaiting carrier review.
  * - `active` — approved; numbers can be assigned.
  * - `failed` — rejected; see `failureReasons`.
@@ -166,7 +193,9 @@ export type TenDlcCampaignStatus =
   | "active"
   | "failed"
   | "suspended"
-  | "expired";
+  | "expired"
+  | "awaiting_review"
+  | "changes_requested";
 
 /**
  * A messaging campaign registered for carrier review.
@@ -190,6 +219,14 @@ export interface TenDlcCampaign {
   throughput: TenDlcThroughput | null;
   /** Why the review failed, when `status` is "failed" */
   failureReasons: string[] | null;
+  /** What to change, when `status` is "changes_requested" */
+  reviewNote?: string | null;
+  /** Paid resubmissions made after a carrier rejection */
+  resubmissionCount?: number;
+  /** True when a failed campaign has used up its resubmissions */
+  resubmissionLimitReached?: boolean;
+  /** Whether the campaign can still be discarded */
+  deletable?: boolean;
   /** When the campaign was created (ISO 8601) */
   createdAt: string;
   /** When the campaign was last updated (ISO 8601) */

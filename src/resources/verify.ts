@@ -230,22 +230,35 @@ export class VerifyResource {
   /**
    * Check/verify an OTP code
    *
+   * A correct code resolves with `status: "verified"`. Every other outcome
+   * throws: a wrong code throws a {@link ValidationError} with code
+   * `invalid_code` and the attempts left in `error.response.remaining_attempts`,
+   * an expired code throws code `expired` (HTTP 410), and a verification with
+   * no attempts left throws code `max_attempts_exceeded` (HTTP 429).
+   *
    * @param id - Verification ID
    * @param request - The code to verify
-   * @returns Verification result
+   * @returns The verification, with `status: "verified"`
    *
    * @example
    * ```typescript
-   * const result = await sendly.verify.check('ver_xxx', {
-   *   code: '123456'
-   * });
-   *
-   * if (result.status === 'verified') {
+   * try {
+   *   await sendly.verify.check('ver_xxx', { code: '123456' });
    *   // User is verified
-   * } else if (result.remainingAttempts !== undefined) {
-   *   console.log(`Wrong code. ${result.remainingAttempts} attempts remaining`);
+   * } catch (err) {
+   *   if (err instanceof SendlyError && err.code === 'invalid_code') {
+   *     console.log(`Wrong code. ${err.response?.remaining_attempts} attempts remaining`);
+   *   } else if (err instanceof SendlyError && err.code === 'expired') {
+   *     console.log('The code expired');
+   *   } else {
+   *     throw err;
+   *   }
    * }
    * ```
+   *
+   * @throws {ValidationError} `invalid_code` (400) when the code is wrong
+   * @throws {SendlyError} `expired` (410) or `max_attempts_exceeded` (429)
+   * @throws {NotFoundError} If the verification doesn't exist
    */
   async check(
     id: string,

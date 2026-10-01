@@ -2,8 +2,14 @@
  * Tests for Webhook Utilities
  */
 
+import { createHmac } from "node:crypto";
 import { describe, it, expect } from "vitest";
-import { Webhooks, WebhookSignatureError } from "../src/utils/webhooks";
+import {
+  Webhooks,
+  WebhookSignatureError,
+  verifyWebhookSignature,
+  parseWebhookEvent,
+} from "../src/utils/webhooks";
 import type { WebhookEvent } from "../src/types";
 
 describe("Webhooks", () => {
@@ -465,6 +471,51 @@ describe("Webhooks", () => {
     it("should accept custom message", () => {
       const error = new WebhookSignatureError("Custom error message");
       expect(error.message).toBe("Custom error message");
+    });
+  });
+
+  describe("a delivery signed the way the API signs it", () => {
+    const timestamp = String(Math.floor(Date.now() / 1000));
+    const body = JSON.stringify({
+      id: "evt_0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c",
+      type: "message.delivered",
+      api_version: "2024-01",
+      created: Number(timestamp),
+      livemode: true,
+      data: {
+        object: {
+          id: "msg_1",
+          to: "+15551234567",
+          from: "+18005550100",
+          text: "Hi",
+          status: "delivered",
+          direction: "outbound",
+          segments: 1,
+          credits_used: 2,
+          created_at: Number(timestamp) - 5,
+          delivered_at: Number(timestamp),
+        },
+      },
+    });
+    const signature =
+      "sha256=" +
+      createHmac("sha256", testSecret)
+        .update(`${timestamp}.${body}`, "utf8")
+        .digest("hex");
+
+    it("verifies with the timestamp-taking helpers", () => {
+      expect(verifyWebhookSignature(body, signature, testSecret, timestamp)).toBe(true);
+      expect(new Webhooks(testSecret).verify(body, signature, timestamp)).toBe(true);
+      expect(
+        parseWebhookEvent(body, signature, testSecret, timestamp).data.object.id,
+      ).toBe("msg_1");
+    });
+
+    it("cannot be verified by the static helpers, which take no timestamp", () => {
+      expect(Webhooks.verifySignature(body, signature, testSecret)).toBe(false);
+      expect(() => Webhooks.parseEvent(body, signature, testSecret)).toThrow(
+        WebhookSignatureError,
+      );
     });
   });
 

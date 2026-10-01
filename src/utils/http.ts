@@ -4,7 +4,12 @@
  */
 
 import { randomUUID } from "node:crypto";
-import type { RequestOptions, RateLimitInfo, ApiErrorResponse } from "../types";
+import type {
+  RequestOptions,
+  RateLimitInfo,
+  ApiErrorResponse,
+  SendlyErrorCode,
+} from "../types";
 import {
   SendlyError,
   NetworkError,
@@ -24,6 +29,28 @@ export interface HttpClientConfig {
   timeout: number;
   maxRetries: number;
   organizationId?: string;
+}
+
+function errorCodeForStatus(status: number): SendlyErrorCode {
+  switch (status) {
+    case 400:
+    case 422:
+      return "invalid_request";
+    case 401:
+      return "unauthorized";
+    case 402:
+      return "insufficient_credits";
+    case 403:
+      return "forbidden";
+    case 404:
+      return "not_found";
+    case 409:
+      return "conflict";
+    case 429:
+      return "rate_limit_exceeded";
+    default:
+      return "internal_error";
+  }
 }
 
 /**
@@ -115,7 +142,7 @@ export class HttpClient {
     const url = this.buildUrl(options.path, options.query, options.unversioned);
 
     const explicitKey = this.normalizeIdempotencyKey(options.idempotencyKey);
-    let idempotencyKey =
+    const idempotencyKey =
       explicitKey ??
       (options.method === "POST" && options.autoIdempotencyKey !== false
         ? this.generateIdempotencyKey()
@@ -146,55 +173,15 @@ export class HttpClient {
       } catch (error) {
         lastError = error as Error;
 
-        // Don't retry on certain errors
-        if (error instanceof SendlyError) {
-          // Don't retry authentication errors
-          if (error.statusCode === 401 || error.statusCode === 403) {
-            throw error;
-          }
-
-          // Don't retry validation errors
-          if (error.statusCode === 400 || error.statusCode === 404) {
-            throw error;
-          }
-
-          // Don't retry insufficient credits
-          if (error.statusCode === 402) {
-            throw error;
-          }
-
-          // Don't retry rate limiting - throw immediately so caller can decide
-          if (error instanceof RateLimitError) {
-            throw error;
-          }
-
-          // Don't retry a response that was not the API. invalid_response means
-          // something other than Sendly answered — a wrong baseUrl, a proxy, a
-          // captive portal — and retrying cannot change that. It carries the
-          // response's own status, so a non-JSON 200 would otherwise fall
-          // through to the 5xx branch and re-send the request, POSTs included,
-          // against whatever that endpoint is.
-          if (error.code === "invalid_response") {
-            throw error;
-          }
+        if (
+          !this.isRetryable(error) ||
+          (options.retryUnsentOnly === true && !this.isKeyCheckBusy(error))
+        ) {
+          throw error;
         }
 
-        // Retry on network errors and 5xx errors
         if (attempt < this.config.maxRetries) {
-          // A 5xx means the server responded (and may have cached that
-          // response under the key), so an auto-generated key is rotated to
-          // let the retry re-execute. Timeouts and network errors leave the
-          // outcome unknown — the key is kept so the server can dedupe a
-          // request that actually went through. Caller-supplied keys are
-          // never rotated.
-          if (
-            !explicitKey &&
-            idempotencyKey &&
-            this.isServerErrorResponse(error)
-          ) {
-            idempotencyKey = this.generateIdempotencyKey();
-          }
-          const backoffTime = this.calculateBackoff(attempt);
+          const backoffTime = this.retryDelay(error, attempt);
           await this.sleep(backoffTime);
           continue;
         }
@@ -211,11 +198,12 @@ export class HttpClient {
     path: string,
     body: FormData,
     headers: Record<string, string> = {},
+    options: Pick<RequestOptions, "retryUnsentOnly"> = {},
   ): Promise<T> {
     const url = this.buildUrl(path);
 
     const callerKey = this.normalizeIdempotencyKey(headers["Idempotency-Key"]);
-    let idempotencyKey = callerKey ?? this.generateIdempotencyKey();
+    const idempotencyKey = callerKey ?? this.generateIdempotencyKey();
 
     let lastError: Error | undefined;
 
@@ -241,26 +229,15 @@ export class HttpClient {
       } catch (error) {
         lastError = error as Error;
 
-        if (error instanceof SendlyError) {
-          if (
-            error.statusCode === 401 ||
-            error.statusCode === 403 ||
-            error.statusCode === 400 ||
-            error.statusCode === 404 ||
-            error.statusCode === 402
-          ) {
-            throw error;
-          }
-          if (error instanceof RateLimitError) {
-            throw error;
-          }
+        if (
+          !this.isRetryable(error) ||
+          (options.retryUnsentOnly === true && !this.isKeyCheckBusy(error))
+        ) {
+          throw error;
         }
 
         if (attempt < this.config.maxRetries) {
-          if (!callerKey && this.isServerErrorResponse(error)) {
-            idempotencyKey = this.generateIdempotencyKey();
-          }
-          const backoffTime = this.calculateBackoff(attempt);
+          const backoffTime = this.retryDelay(error, attempt);
           await this.sleep(backoffTime);
           continue;
         }
@@ -297,17 +274,21 @@ export class HttpClient {
     return trimmed;
   }
 
-  /**
-   * True when the error carries an actual 5xx response from the server,
-   * as opposed to a timeout or network failure where the outcome of the
-   * request is unknown. TimeoutError and NetworkError carry no statusCode.
-   */
-  private isServerErrorResponse(error: unknown): boolean {
-    return (
-      error instanceof SendlyError &&
-      typeof error.statusCode === "number" &&
-      error.statusCode >= 500
-    );
+  private isRetryable(error: unknown): boolean {
+    if (!(error instanceof SendlyError)) return true;
+    if (error instanceof NetworkError || error instanceof TimeoutError) {
+      return true;
+    }
+    // Don't retry a response that was not the API. invalid_response means
+    // something other than Sendly answered — a wrong baseUrl, a proxy, a
+    // captive portal — and retrying cannot change that. It carries the
+    // response's own status, so a non-JSON 200 would otherwise fall
+    // through to the 5xx branch and re-send the request, POSTs included,
+    // against whatever that endpoint is.
+    if (error.code === "invalid_response") return false;
+    if (this.isKeyCheckBusy(error)) return true;
+    const status = error.statusCode;
+    return status === undefined || status === 408 || status >= 500;
   }
 
   /**
@@ -346,6 +327,10 @@ export class HttpClient {
    * Parse the response body
    */
   private async parseResponse<T>(response: Response): Promise<T> {
+    if (response.status === 204 || response.status === 205) {
+      return undefined as T;
+    }
+
     const contentType = response.headers.get("content-type");
     let data: unknown;
 
@@ -377,11 +362,29 @@ export class HttpClient {
     // Handle error responses
     if (!response.ok) {
       const errorResponse = data as ApiErrorResponse;
-      throw SendlyError.fromResponse(response.status, {
+      const rawError = errorResponse?.error;
+      const sentence =
+        typeof rawError === "string" && !/^[a-z][a-z0-9_]*$/.test(rawError)
+          ? rawError
+          : undefined;
+      const body: ApiErrorResponse = {
         ...errorResponse,
-        error: errorResponse?.error || "internal_error",
+        error: rawError || "internal_error",
         message: errorResponse?.message || `HTTP ${response.status}`,
-      });
+      };
+      throw SendlyError.fromResponse(
+        response.status,
+        {
+          ...body,
+          error:
+            rawError && !sentence
+              ? rawError
+              : errorCodeForStatus(response.status),
+          message:
+            errorResponse?.message || sentence || `HTTP ${response.status}`,
+        },
+        body,
+      );
     }
 
     return data as T;
@@ -404,6 +407,12 @@ export class HttpClient {
       base = base.replace(/\/v1$/, "");
     }
     const cleanPath = path.startsWith("/") ? path.slice(1) : path;
+    const segments = cleanPath.split(/[?#]/, 1)[0].split("/");
+    if (segments.some((s) => s === "" || s === "." || s === "..")) {
+      throw new ValidationError(
+        `An id in the request path is empty, "." or "..", which would send the request to a different endpoint: ${path}`,
+      );
+    }
     const fullUrl = `${base}/${cleanPath}`;
     const url = new URL(fullUrl);
 
@@ -454,6 +463,19 @@ export class HttpClient {
         reset: parseInt(reset, 10),
       };
     }
+  }
+
+  private isKeyCheckBusy(error: unknown): error is RateLimitError {
+    return (
+      error instanceof RateLimitError &&
+      error.code === "too_many_concurrent_verifications" &&
+      error.retryAfter <= 60
+    );
+  }
+
+  private retryDelay(error: unknown, attempt: number): number {
+    if (this.isKeyCheckBusy(error)) return error.retryAfter * 1000;
+    return this.calculateBackoff(attempt);
   }
 
   /**

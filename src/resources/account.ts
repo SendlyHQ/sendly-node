@@ -13,6 +13,30 @@ import type {
   RotateApiKeyResponse,
 } from "../types";
 
+type RawApiKey = Partial<ApiKey> & {
+  keyPrefix?: string | null;
+  scopes?: string[] | null;
+  revokedAt?: string | null;
+  [key: string]: unknown;
+};
+
+function toApiKey<T extends ApiKey>(raw: RawApiKey): T {
+  return {
+    ...raw,
+    prefix:
+      raw.prefix !== undefined
+        ? raw.prefix
+        : raw.keyPrefix
+          ? `${raw.keyPrefix}...`
+          : undefined,
+    permissions: raw.permissions !== undefined ? raw.permissions : raw.scopes,
+    isRevoked:
+      raw.isRevoked !== undefined
+        ? raw.isRevoked
+        : raw.revokedAt != null || raw.isActive === false,
+  } as T;
+}
+
 /**
  * Account API resource
  *
@@ -50,12 +74,28 @@ export class AccountResource {
    * ```
    */
   async get(): Promise<Account> {
-    const account = await this.http.request<Account>({
+    const raw = await this.http.request<
+      Partial<Account> & {
+        user?: { id: string; email: string; createdAt: string };
+        credits?: { balance?: number | string; reservedBalance?: number | string };
+      }
+    >({
       method: "GET",
       path: "/account",
     });
 
-    return account;
+    return {
+      ...raw,
+      id: raw.user?.id ?? raw.id,
+      email: raw.user?.email ?? raw.email,
+      createdAt: raw.user?.createdAt ?? raw.createdAt,
+      ...(raw.credits && {
+        credits: {
+          balance: Number(raw.credits.balance ?? 0),
+          reservedBalance: Number(raw.credits.reservedBalance ?? 0),
+        },
+      }),
+    } as Account;
   }
 
   /**
@@ -82,9 +122,9 @@ export class AccountResource {
   }
 
   /**
-   * Get credit transaction history
+   * Get credit transaction history, newest first
    *
-   * @param options - Pagination options
+   * @param options - Pagination options, and a transaction type to filter by
    * @returns Array of credit transactions
    *
    * @example
@@ -95,22 +135,43 @@ export class AccountResource {
    *   const sign = tx.amount > 0 ? '+' : '';
    *   console.log(`${tx.type}: ${sign}${tx.amount} credits - ${tx.description}`);
    * }
+   *
+   * // Only refunds
+   * const refunds = await sendly.account.getCreditTransactions({ type: 'refund' });
    * ```
    */
   async getCreditTransactions(options?: {
     limit?: number;
     offset?: number;
+    type?: CreditTransaction["type"];
   }): Promise<CreditTransaction[]> {
-    const transactions = await this.http.request<CreditTransaction[]>({
+    const response = await this.http.request<{
+      transactions?: Array<{
+        id: string;
+        amount: number;
+        balance_after: number;
+        type: CreditTransaction["type"];
+        description: string;
+        created_at: string;
+      }>;
+    }>({
       method: "GET",
       path: "/credits/transactions",
       query: {
         limit: options?.limit,
         offset: options?.offset,
+        type: options?.type,
       },
     });
 
-    return transactions;
+    return (response.transactions ?? []).map((t) => ({
+      id: t.id,
+      type: t.type,
+      amount: t.amount,
+      balanceAfter: t.balance_after,
+      description: t.description,
+      createdAt: t.created_at,
+    }));
   }
 
   async transferCredits(options: {
@@ -144,17 +205,17 @@ export class AccountResource {
    * const keys = await sendly.account.listApiKeys();
    *
    * for (const key of keys) {
-   *   console.log(`${key.name}: ${key.prefix}...${key.lastFour} (${key.type})`);
+   *   console.log(`${key.name}: ${key.prefix} (${key.type})`);
    * }
    * ```
    */
   async listApiKeys(): Promise<ApiKey[]> {
-    const response = await this.http.request<{ keys: ApiKey[] }>({
+    const response = await this.http.request<{ keys: RawApiKey[] }>({
       method: "GET",
       path: "/account/keys",
     });
 
-    return response.keys;
+    return response.keys.map((key) => toApiKey(key));
   }
 
   /**
@@ -170,12 +231,12 @@ export class AccountResource {
    * ```
    */
   async getApiKey(id: string): Promise<ApiKey> {
-    const key = await this.http.request<ApiKey>({
+    const key = await this.http.request<RawApiKey>({
       method: "GET",
       path: `/account/keys/${encodeURIComponent(id)}`,
     });
 
-    return key;
+    return toApiKey(key);
   }
 
   /**
@@ -202,35 +263,68 @@ export class AccountResource {
   /**
    * Create a new API key
    *
+   * Creates a test key unless `type` is `'live'`. A live key needs a
+   * verified business and a credit balance.
+   *
+   * `apiKey.expiresAt` in the result is the expiry the key was created
+   * with, or `null` if it has none, so check it if you rely on `expiresAt`.
+   * When the response does not list the key's scopes, `apiKey.permissions`
+   * is the `scopes` you passed, or undefined if you passed none.
+   *
    * @param name - Display name for the API key
-   * @param options - Optional settings
+   * @param options - `type` (`'test'` or `'live'`, default `'test'`),
+   *   `scopes` to grant the key, and `expiresAt` (ISO 8601)
    * @returns The created API key with the full key value (only shown once)
    *
    * @example
    * ```typescript
-   * const { apiKey, key } = await sendly.account.createApiKey('Production');
+   * const { apiKey, key } = await sendly.account.createApiKey('Production', {
+   *   type: 'live',
+   * });
    * console.log(`Created key: ${key}`); // Full key - save this!
    * console.log(`Key ID: ${apiKey.id}`);
    * ```
+   *
+   * @throws {SendlyError} `verification_required` (403) or `credits_required` (402) for a live key
    */
   async createApiKey(
     name: string,
-    options?: { expiresAt?: string },
+    options?: {
+      expiresAt?: string;
+      type?: "test" | "live";
+      scopes?: string[];
+    },
   ): Promise<{ apiKey: ApiKey; key: string }> {
     if (!name) {
       throw new Error("API key name is required");
     }
 
-    const response = await this.http.request<{ apiKey: ApiKey; key: string }>({
+    const response = await this.http.request<
+      RawApiKey & { key: string; apiKey?: RawApiKey }
+    >({
       method: "POST",
       path: "/account/keys",
       body: {
         name,
+        type: options?.type ?? "test",
+        ...(options?.scopes && { scopes: options.scopes }),
         ...(options?.expiresAt && { expiresAt: options.expiresAt }),
       },
     });
 
-    return response;
+    const apiKey =
+      response.apiKey ??
+      ({
+        id: response.id,
+        name: response.name,
+        type: response.type,
+        keyPrefix: response.keyPrefix,
+        createdAt: response.createdAt,
+        expiresAt: response.expiresAt ?? null,
+        ...(options?.scopes && { scopes: options.scopes }),
+      } as RawApiKey);
+
+    return { ...response, apiKey: toApiKey(apiKey), key: response.key };
   }
 
   /**
@@ -276,13 +370,13 @@ export class AccountResource {
       throw new Error("New name is required");
     }
 
-    const key = await this.http.request<ApiKey>({
+    const key = await this.http.request<RawApiKey>({
       method: "PATCH",
       path: `/account/keys/${encodeURIComponent(id)}/rename`,
       body: { name },
     });
 
-    return key;
+    return toApiKey(key);
   }
 
   /**
@@ -320,12 +414,22 @@ export class AccountResource {
       throw new Error("API key ID is required");
     }
 
-    return this.http.request<RotateApiKeyResponse>({
+    const response = await this.http.request<{
+      newKey: RawApiKey;
+      oldKey: RawApiKey;
+      message: string;
+    }>({
       method: "POST",
       path: `/account/keys/${encodeURIComponent(id)}/rotate`,
       body: options?.gracePeriodHours
         ? { gracePeriodHours: options.gracePeriodHours }
         : {},
     });
+
+    return {
+      ...response,
+      newKey: toApiKey(response.newKey),
+      oldKey: toApiKey(response.oldKey),
+    } as RotateApiKeyResponse;
   }
 }

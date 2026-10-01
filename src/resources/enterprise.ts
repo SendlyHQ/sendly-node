@@ -55,7 +55,9 @@ import type {
   CreatedApiKey,
   WorkspaceCredits,
   EnterpriseWebhook,
+  EnterpriseWebhookSecretRotation,
   EnterpriseWebhookTestResult,
+  InheritVerificationResult,
   AnalyticsOverview,
   MessageAnalytics,
   DeliveryAnalyticsItem,
@@ -206,17 +208,29 @@ class WorkspacesSubResource {
     return this.submitVerification(workspaceId, partialUpdates);
   }
 
+  /**
+   * Give a workspace the verification of another workspace you own.
+   *
+   * By default the workspace shares the source workspace's number. With
+   * `purchaseNewNumber: true` it copies the business details, orders a new
+   * toll-free number for the workspace and submits the verification for it.
+   */
   async inheritVerification(
     workspaceId: string,
-    options: { sourceWorkspaceId: string },
-  ): Promise<unknown> {
+    options: { sourceWorkspaceId: string; purchaseNewNumber?: boolean },
+  ): Promise<InheritVerificationResult> {
     const response = await this.http.request<unknown>({
       method: "POST",
       path: `/enterprise/workspaces/${encodeURIComponent(workspaceId)}/verification/inherit`,
-      body: { source_workspace_id: options.sourceWorkspaceId },
+      body: {
+        sourceWorkspaceId: options.sourceWorkspaceId,
+        ...(options.purchaseNewNumber !== undefined && {
+          purchaseNewNumber: options.purchaseNewNumber,
+        }),
+      },
     });
 
-    return transformKeys(response);
+    return transformKeys<InheritVerificationResult>(response);
   }
 
   async getVerification(workspaceId: string): Promise<unknown> {
@@ -243,7 +257,7 @@ class WorkspacesSubResource {
       method: "POST",
       path: `/enterprise/workspaces/${encodeURIComponent(workspaceId)}/transfer-credits`,
       body: {
-        source_workspace_id: options.sourceWorkspaceId,
+        sourceWorkspaceId: options.sourceWorkspaceId,
         amount: options.amount,
       },
     });
@@ -268,8 +282,9 @@ class WorkspacesSubResource {
       method: "POST",
       path: `/enterprise/workspaces/${encodeURIComponent(workspaceId)}/keys`,
       body: {
-        ...(options?.name && { name: options.name }),
+        name: options?.name || "API key",
         ...(options?.type && { type: options.type }),
+        ...(options?.scopes && { scopes: options.scopes }),
       },
     });
 
@@ -432,8 +447,8 @@ class WorkspacesSubResource {
     if (!Array.isArray(workspaces) || workspaces.length === 0) {
       throw new Error("workspaces array is required");
     }
-    if (workspaces.length > 50) {
-      throw new Error("Maximum 50 workspaces per bulk provision");
+    if (workspaces.length > 100) {
+      throw new Error("Maximum 100 workspaces per bulk provision");
     }
 
     const response = await this.http.request<unknown>({
@@ -534,7 +549,17 @@ class WebhooksSubResource {
     this.http = http;
   }
 
-  async set(options: { url: string }): Promise<EnterpriseWebhook> {
+  /**
+   * Register the enterprise webhook, or change its URL and filters.
+   *
+   * The first registration creates the signing secret and returns it as
+   * `signingSecret`, once. Later calls keep the secret and do not return it.
+   */
+  async set(options: {
+    url: string;
+    events?: string[];
+    workspaces?: string[];
+  }): Promise<EnterpriseWebhook> {
     if (!options.url) {
       throw new Error("Webhook URL is required");
     }
@@ -542,7 +567,11 @@ class WebhooksSubResource {
     const response = await this.http.request<unknown>({
       method: "POST",
       path: "/enterprise/webhooks",
-      body: { url: options.url },
+      body: {
+        url: options.url,
+        ...(options.events && { events: options.events }),
+        ...(options.workspaces && { workspaces: options.workspaces }),
+      },
     });
 
     return transformKeys<EnterpriseWebhook>(response);
@@ -573,13 +602,17 @@ class WebhooksSubResource {
     return transformKeys<EnterpriseWebhookTestResult>(response);
   }
 
-  async rotateSecret(): Promise<EnterpriseWebhook> {
+  /**
+   * Replace the enterprise webhook signing secret. The new secret is
+   * returned once; deliveries are signed with it from now on.
+   */
+  async rotateSecret(): Promise<EnterpriseWebhookSecretRotation> {
     const response = await this.http.request<unknown>({
       method: "POST",
       path: "/enterprise/webhooks/rotate-secret",
     });
 
-    return transformKeys<EnterpriseWebhook>(response);
+    return transformKeys<EnterpriseWebhookSecretRotation>(response);
   }
 }
 
@@ -637,7 +670,8 @@ class AnalyticsSubResource {
       path: `/enterprise/analytics/credits${query ? `?${query}` : ""}`,
     });
 
-    return transformKeys<CreditAnalytics>(response);
+    const credits = transformKeys<CreditAnalytics>(response);
+    return { ...credits, data: credits.data ?? [] };
   }
 }
 
@@ -768,6 +802,9 @@ export class EnterpriseResource {
     }
     if (options.inheritWithNewNumber) {
       body.inheritWithNewNumber = true;
+    }
+    if (options.verificationOverrides) {
+      body.verificationOverrides = options.verificationOverrides;
     }
     if (options.verification) {
       body.verification = options.verification;

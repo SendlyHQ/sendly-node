@@ -21,10 +21,13 @@ async function main() {
   console.log('1. Comprehensive error handling:\n');
 
   try {
-    await sendly.messages.send({
-      to: SANDBOX_TEST_NUMBERS.INVALID, // This will fail
+    const failed = await sendly.messages.send({
+      to: SANDBOX_TEST_NUMBERS.INVALID, // resolves with status 'failed'; a failed delivery is not thrown
       text: 'Test message',
     });
+    console.log(`   Sandbox send status: ${failed.status}\n`);
+
+    await sendly.messages.get('00000000-0000-4000-8000-000000000000'); // no such message: throws NotFoundError
   } catch (error) {
     if (error instanceof AuthenticationError) {
       // API key is invalid, revoked, or expired
@@ -32,6 +35,12 @@ async function main() {
       console.log(`   Code: ${error.code}`);
       console.log(`   Message: ${error.message}`);
       console.log('   Action: Check your API key\n');
+    } else if (error instanceof RateLimitError && error.code === 'too_many_failed_key_attempts') {
+      // Repeated wrong API keys from this address locked the account out
+      console.log('   Rate Limit Error (failed key attempts):');
+      console.log(`   Message: ${error.message}`);
+      console.log(`   Lockout ends in: ${error.retryAfter} seconds`);
+      console.log('   Action: Fix the API key; retrying will not help\n');
     } else if (error instanceof RateLimitError) {
       // Too many requests
       console.log('   Rate Limit Error:');
@@ -91,6 +100,9 @@ async function main() {
         case 'rate_limit_exceeded':
           console.log('   Slow down!');
           break;
+        case 'too_many_failed_key_attempts':
+          console.log('   Locked out after wrong API keys: fix the key');
+          break;
         default:
           console.log(`   Error: ${error.code}`);
       }
@@ -110,7 +122,11 @@ async function main() {
         console.log(`   Success on attempt ${attempt}: ${message.id}`);
         return;
       } catch (error) {
-        if (error instanceof RateLimitError && attempt < maxRetries) {
+        if (
+          error instanceof RateLimitError &&
+          error.code === 'rate_limit_exceeded' &&
+          attempt < maxRetries
+        ) {
           console.log(`   Rate limited, waiting ${error.retryAfter}s...`);
           await new Promise((r) => setTimeout(r, error.retryAfter * 1000));
         } else {

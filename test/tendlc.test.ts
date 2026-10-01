@@ -459,4 +459,72 @@ describe("10DLC Resource", () => {
       );
     });
   });
+  describe("review statuses and fields the API sends", () => {
+    it("reads a campaign held for review", async () => {
+      fetchMock.mockResolvedValue(
+        mockFetchResponse({
+          data: {
+            ...mockCampaign,
+            status: "awaiting_review",
+            reviewNote: null,
+            resubmissionCount: 0,
+            resubmissionLimitReached: false,
+            deletable: true,
+          },
+        }),
+      );
+
+      const { data: campaign } = await client.tenDlc.getCampaign("cmp_abc123");
+
+      expect(campaign.status).toBe("awaiting_review");
+      expect(campaign.deletable).toBe(true);
+      expect(campaign.resubmissionCount).toBe(0);
+    });
+
+    it("reads the note on a campaign with changes requested", async () => {
+      fetchMock.mockResolvedValue(
+        mockFetchResponse({
+          data: {
+            ...mockCampaign,
+            status: "changes_requested",
+            reviewNote: "Add an opt-out line to each sample message.",
+            resubmissionCount: 0,
+            resubmissionLimitReached: false,
+            deletable: true,
+          },
+        }),
+      );
+
+      const { data: campaign } = await client.tenDlc.getCampaign("cmp_abc123");
+
+      let note: string | null | undefined;
+      if (campaign.status === "changes_requested") note = campaign.reviewNote;
+      expect(note).toBe("Add an opt-out line to each sample message.");
+    });
+
+    it("reads a brand being provisioned and its verification fields", async () => {
+      fetchMock.mockResolvedValue(
+        mockFetchResponse({
+          data: {
+            ...mockBrand,
+            status: "provisioning",
+            smsOtpStatus: null,
+            mobileLast4: "0142",
+            vetting: null,
+            einDocument: null,
+          },
+        }),
+      );
+
+      const { data: brand } = await client.tenDlc.getBrand("brd_abc123");
+
+      const inReview =
+        brand.status === "awaiting_review" ||
+        brand.status === "changes_requested" ||
+        brand.status === "provisioning";
+      expect(inReview).toBe(true);
+      expect(brand.mobileLast4).toBe("0142");
+      expect(brand.vetting).toBeNull();
+    });
+  });
 });

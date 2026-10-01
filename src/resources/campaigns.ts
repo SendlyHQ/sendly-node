@@ -4,6 +4,7 @@
  */
 
 import type { HttpClient } from "../utils/http";
+import { ValidationError } from "../errors";
 import type {
   Campaign,
   CampaignStatus,
@@ -11,8 +12,10 @@ import type {
   UpdateCampaignRequest,
   ScheduleCampaignRequest,
   CampaignPreview,
+  CampaignSendResult,
   ListCampaignsOptions,
   CampaignListResponse,
+  BatchSendResponse,
 } from "../types";
 
 /**
@@ -59,19 +62,26 @@ export class CampaignsResource {
    * const campaign = await sendly.campaigns.create({
    *   name: 'Black Friday Sale',
    *   text: 'Hi {{name}}! 50% off everything today only. Shop now!',
-   *   contactListIds: ['lst_customers', 'lst_subscribers']
+   *   contactListIds: ['lst_customers']
    * });
    * ```
+   *
+   * @throws {ValidationError} If `contactListIds` holds more than one ID
    */
   async create(request: CreateCampaignRequest): Promise<Campaign> {
+    const targetListId =
+      request.contactListIds && oneContactList(request.contactListIds);
+
     const response = await this.http.request<RawCampaign>({
       method: "POST",
       path: "/campaigns",
       body: {
         name: request.name,
         text: request.text,
+        messageText: request.text,
         templateId: request.templateId,
         contactListIds: request.contactListIds,
+        ...(targetListId !== undefined && { targetListId }),
       },
     });
 
@@ -131,7 +141,7 @@ export class CampaignsResource {
    *
    * @example
    * ```typescript
-   * const campaign = await sendly.campaigns.get('cmp_xxx');
+   * const campaign = await sendly.campaigns.get('camp_xxx');
    * console.log(`Status: ${campaign.status}`);
    * console.log(`Delivered: ${campaign.deliveredCount}/${campaign.recipientCount}`);
    * ```
@@ -154,24 +164,30 @@ export class CampaignsResource {
    *
    * @example
    * ```typescript
-   * const campaign = await sendly.campaigns.update('cmp_xxx', {
+   * const campaign = await sendly.campaigns.update('camp_xxx', {
    *   name: 'Updated Campaign Name',
    *   text: 'New message text with {{variable}}'
    * });
    * ```
+   *
+   * @throws {ValidationError} If `contactListIds` holds more than one ID
    */
   async update(id: string, request: UpdateCampaignRequest): Promise<Campaign> {
+    const targetListId =
+      request.contactListIds && oneContactList(request.contactListIds);
+
     const response = await this.http.request<RawCampaign>({
       method: "PATCH",
       path: `/campaigns/${encodeURIComponent(id)}`,
       body: {
         ...(request.name && { name: request.name }),
-        ...(request.text && { text: request.text }),
+        ...(request.text && { text: request.text, messageText: request.text }),
         ...(request.templateId !== undefined && {
           template_id: request.templateId,
         }),
         ...(request.contactListIds && {
           contact_list_ids: request.contactListIds,
+          targetListId,
         }),
       },
     });
@@ -188,7 +204,7 @@ export class CampaignsResource {
    *
    * @example
    * ```typescript
-   * await sendly.campaigns.delete('cmp_xxx');
+   * await sendly.campaigns.delete('camp_xxx');
    * ```
    */
   async delete(id: string): Promise<void> {
@@ -208,7 +224,7 @@ export class CampaignsResource {
    *
    * @example
    * ```typescript
-   * const preview = await sendly.campaigns.preview('cmp_xxx');
+   * const preview = await sendly.campaigns.preview('camp_xxx');
    *
    * console.log(`Recipients: ${preview.recipientCount}`);
    * console.log(`Estimated cost: ${preview.estimatedCredits} credits`);
@@ -220,59 +236,83 @@ export class CampaignsResource {
    * ```
    */
   async preview(id: string): Promise<CampaignPreview> {
-    const response = await this.http.request<{
-      id: string;
-      recipient_count: number;
-      estimated_segments: number;
-      estimated_credits: number;
-      current_balance: number;
-      has_enough_credits: boolean;
-      breakdown?: Array<{
-        country: string;
-        count: number;
-        credits_per_message: number;
-        total_credits: number;
-      }>;
-    }>({
+    const response = await this.http.request<
+      Omit<CampaignPreview, "id" | "breakdown" | "recipientCount"> & {
+        recipientCount?: number;
+        totalRecipients?: number;
+      }
+    >({
       method: "GET",
       path: `/campaigns/${encodeURIComponent(id)}/preview`,
     });
 
     return {
-      id: response.id,
-      recipientCount: response.recipient_count,
-      estimatedSegments: response.estimated_segments,
-      estimatedCredits: response.estimated_credits,
-      currentBalance: response.current_balance,
-      hasEnoughCredits: response.has_enough_credits,
-      breakdown: response.breakdown?.map((b) => ({
-        country: b.country,
-        count: b.count,
-        creditsPerMessage: b.credits_per_message,
-        totalCredits: b.total_credits,
-      })),
+      id,
+      recipientCount: response.recipientCount ?? response.totalRecipients ?? 0,
+      estimatedCredits: response.estimatedCredits,
+      currentBalance: Number(response.currentBalance ?? 0),
+      hasEnoughCredits: response.hasEnoughCredits,
+      breakdown: response.byCountry
+        ? Object.entries(response.byCountry).map(([country, c]) => ({
+            country,
+            count: c.count,
+            creditsPerMessage: c.count > 0 ? c.credits / c.count : 0,
+            totalCredits: c.credits,
+          }))
+        : undefined,
+      blockedCount: response.blockedCount,
+      sendableCount: response.sendableCount,
+      byCountry: response.byCountry,
+      warnings: response.warnings,
+      messagingProfile: response.messagingProfile,
+      optedOutCount: response.optedOutCount,
+      invalidCount: response.invalidCount,
+      invalidNumberCount: response.invalidNumberCount,
+      landlineCount: response.landlineCount,
+      sampleRecipients: response.sampleRecipients,
     };
   }
 
   /**
    * Send a campaign immediately
    *
+   * Sends one message per recipient as a batch, and marks the campaign
+   * `completed`.
+   *
    * @param id - Campaign ID
-   * @returns The updated campaign (status: sending)
+   * @returns The batch the messages went out in, with the counts
    *
    * @example
    * ```typescript
-   * const campaign = await sendly.campaigns.send('cmp_xxx');
-   * console.log(`Campaign is now ${campaign.status}`);
+   * const result = await sendly.campaigns.send('camp_xxx');
+   * console.log(`Sent ${result.sentCount} of ${result.recipientCount}`);
+   *
+   * // Delivery results arrive later
+   * const batch = await sendly.messages.getBatch(result.batchId);
    * ```
    */
-  async send(id: string): Promise<Campaign> {
-    const response = await this.http.request<RawCampaign>({
+  async send(id: string): Promise<CampaignSendResult> {
+    const response = await this.http.request<BatchSendResponse>({
       method: "POST",
       path: `/campaigns/${encodeURIComponent(id)}/send`,
     });
 
-    return this.transformCampaign(response);
+    return {
+      id,
+      batchId: response.batchId,
+      status: response.status,
+      recipientCount: response.total,
+      sentCount: response.sent,
+      failedCount: response.failed,
+      ...(response.retrying !== undefined && {
+        retryingCount: response.retrying,
+      }),
+      creditsUsed: response.creditsUsed,
+      creditsRefunded: response.creditsRefunded ?? 0,
+      optedOutSkipped: response.optedOutSkipped ?? 0,
+      invalidSkipped: response.invalidSkipped ?? 0,
+      messages: response.messages ?? [],
+    };
   }
 
   /**
@@ -284,7 +324,7 @@ export class CampaignsResource {
    *
    * @example
    * ```typescript
-   * const campaign = await sendly.campaigns.schedule('cmp_xxx', {
+   * const campaign = await sendly.campaigns.schedule('camp_xxx', {
    *   scheduledAt: '2024-01-15T10:00:00Z',
    *   timezone: 'America/New_York'
    * });
@@ -316,7 +356,7 @@ export class CampaignsResource {
    *
    * @example
    * ```typescript
-   * const campaign = await sendly.campaigns.cancel('cmp_xxx');
+   * const campaign = await sendly.campaigns.cancel('camp_xxx');
    * console.log(`Campaign cancelled`);
    * ```
    */
@@ -339,7 +379,7 @@ export class CampaignsResource {
    *
    * @example
    * ```typescript
-   * const cloned = await sendly.campaigns.clone('cmp_xxx');
+   * const cloned = await sendly.campaigns.clone('camp_xxx');
    * console.log(`Created clone: ${cloned.id}`);
    * ```
    */
@@ -356,43 +396,66 @@ export class CampaignsResource {
     return {
       id: raw.id,
       name: raw.name,
-      text: raw.text,
+      text: (raw.text ?? raw.messageText) as string,
       templateId: raw.template_id,
-      contactListIds: raw.contact_list_ids || [],
+      contactListIds:
+        raw.contact_list_ids ?? (raw.targetListId ? [raw.targetListId] : []),
       status: raw.status as CampaignStatus,
-      recipientCount: raw.recipient_count || 0,
-      sentCount: raw.sent_count || 0,
-      deliveredCount: raw.delivered_count || 0,
-      failedCount: raw.failed_count || 0,
-      estimatedCredits: raw.estimated_credits || 0,
-      creditsUsed: raw.credits_used || 0,
-      scheduledAt: raw.scheduled_at,
+      recipientCount: raw.totalRecipients ?? raw.recipient_count ?? 0,
+      sentCount: raw.sentCount ?? raw.sent_count ?? 0,
+      deliveredCount: raw.deliveredCount ?? raw.delivered_count ?? 0,
+      failedCount: raw.failedCount ?? raw.failed_count ?? 0,
+      estimatedCredits: raw.estimatedCredits ?? raw.estimated_credits ?? 0,
+      creditsUsed: raw.creditsUsed ?? raw.credits_used ?? 0,
+      scheduledAt: raw.scheduledAt ?? raw.scheduled_at ?? null,
       timezone: raw.timezone,
-      startedAt: raw.started_at,
-      completedAt: raw.completed_at,
-      createdAt: raw.created_at,
-      updatedAt: raw.updated_at,
+      startedAt: raw.sentAt ?? raw.started_at ?? null,
+      completedAt: raw.completedAt ?? raw.completed_at ?? null,
+      createdAt: (raw.createdAt ?? raw.created_at) as string,
+      updatedAt: (raw.updatedAt ?? raw.updated_at) as string,
     };
   }
+}
+
+function oneContactList(contactListIds: string[]): string | null {
+  if (contactListIds.length > 1) {
+    throw new ValidationError(
+      "A campaign targets one contact list; pass a single ID in contactListIds",
+    );
+  }
+  return contactListIds[0] ?? null;
 }
 
 interface RawCampaign {
   id: string;
   name: string;
-  text: string;
+  text?: string;
+  messageText?: string;
   template_id?: string | null;
   contact_list_ids?: string[];
+  targetListId?: string | null;
   status: string;
+  totalRecipients?: number;
   recipient_count?: number;
+  sentCount?: number;
   sent_count?: number;
+  deliveredCount?: number;
   delivered_count?: number;
+  failedCount?: number;
   failed_count?: number;
+  estimatedCredits?: number;
   estimated_credits?: number;
+  creditsUsed?: number;
   credits_used?: number;
+  scheduledAt?: string | null;
   scheduled_at?: string | null;
   timezone?: string | null;
+  sentAt?: string | null;
   started_at?: string | null;
+  completedAt?: string | null;
   completed_at?: string | null;
-  created_at: string;
-  updated_at: string;
+  createdAt?: string;
+  created_at?: string;
+  updatedAt?: string;
+  updated_at?: string;
 }

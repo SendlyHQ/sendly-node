@@ -286,11 +286,15 @@ export class TemplatesResource {
     variables?: Record<string, string>,
   ): Promise<TemplatePreview> {
     const response = await this.http.request<{
-      id: string;
-      name: string;
+      template_id?: string;
+      id?: string;
+      name?: string;
       original_text: string;
-      preview_text: string;
-      variables: Array<{ key: string; type: string; fallback?: string }>;
+      rendered_text?: string;
+      preview_text?: string;
+      character_count?: number;
+      segment_count?: number;
+      variables?: Array<{ key: string; type: string; fallback?: string }>;
     }>({
       method: "POST",
       path: `/templates/${encodeURIComponent(id)}/preview`,
@@ -298,11 +302,13 @@ export class TemplatesResource {
     });
 
     return {
-      id: response.id,
+      id: response.template_id ?? response.id ?? id,
       name: response.name,
       originalText: response.original_text,
-      previewText: response.preview_text,
-      variables: response.variables.map((v) => ({
+      previewText: (response.rendered_text ?? response.preview_text) as string,
+      characterCount: response.character_count,
+      segmentCount: response.segment_count,
+      variables: (response.variables ?? []).map((v) => ({
         key: v.key,
         type: v.type as "string" | "number",
         fallback: v.fallback,

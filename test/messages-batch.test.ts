@@ -13,7 +13,13 @@ import {
   NetworkError,
 } from "../src/errors";
 import { mockFetchResponse } from "./fixtures/responses";
-import type { BatchMessageResponse, BatchListResponse } from "../src/types";
+import type {
+  BatchMessageResponse,
+  BatchSendResponse,
+  BatchListResponse,
+  BatchPreviewResponse,
+} from "../src/types";
+import { MAX_BATCH_MESSAGES } from "../src/types";
 
 describe("Batch Messages", () => {
   let client: Sendly;
@@ -30,35 +36,28 @@ describe("Batch Messages", () => {
   });
 
   describe("sendBatch()", () => {
-    const mockBatchResponse: BatchMessageResponse = {
+    const mockBatchResponse = {
       batchId: "batch_test123",
       status: "completed",
       total: 2,
-      queued: 2,
       sent: 2,
       failed: 0,
-      creditsUsed: 2,
+      retrying: 0,
+      optedOutSkipped: 0,
+      invalidSkipped: 0,
+      creditsUsed: 4,
+      creditsRefunded: 0,
       messages: [
-        {
-          id: "msg_batch1",
-          to: "+15551234567",
-          status: "queued",
-        },
-        {
-          id: "msg_batch2",
-          to: "+15559876543",
-          status: "queued",
-        },
+        { index: 0, id: "msg_batch1", to: "+15551234567", status: "sent" },
+        { index: 1, id: "msg_batch2", to: "+15559876543", status: "sent" },
       ],
-      createdAt: "2025-01-15T10:00:00Z",
-      completedAt: "2025-01-15T10:00:05Z",
     };
 
     describe("Happy path", () => {
       it("should send batch messages successfully", async () => {
         fetchMock.mockResolvedValue(mockFetchResponse(mockBatchResponse));
 
-        const result = await client.messages.sendBatch({
+        const result: BatchSendResponse = await client.messages.sendBatch({
           messages: [
             { to: "+15551234567", text: "Hello User 1!" },
             { to: "+15559876543", text: "Hello User 2!" },
@@ -68,7 +67,10 @@ describe("Batch Messages", () => {
         expect(result).toEqual(mockBatchResponse);
         expect(result.batchId).toBe("batch_test123");
         expect(result.total).toBe(2);
-        expect(result.queued).toBe(2);
+        expect(result.optedOutSkipped).toBe(0);
+        expect(result.creditsRefunded).toBe(0);
+        expect(result.messages[1].index).toBe(1);
+        expect(result.queued).toBeUndefined();
         expect(fetchMock).toHaveBeenCalledWith(
           expect.stringContaining("/v1/messages/batch"),
           expect.objectContaining({
@@ -120,6 +122,24 @@ describe("Batch Messages", () => {
           client.messages.sendBatch({ messages }),
         ).resolves.toBeDefined();
       });
+
+      it("should send more than 1,000 messages in one request, up to 10,000", async () => {
+        fetchMock.mockResolvedValue(mockFetchResponse(mockBatchResponse));
+
+        for (const length of [1001, MAX_BATCH_MESSAGES]) {
+          const messages = Array.from({ length }, (_, i) => ({
+            to: "+15551234567",
+            text: `Message ${i}`,
+          }));
+          await client.messages.sendBatch({ messages });
+        }
+
+        expect(MAX_BATCH_MESSAGES).toBe(10000);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        expect(JSON.parse(fetchMock.mock.calls[1][1].body).messages).toHaveLength(
+          10000,
+        );
+      });
     });
 
     describe("Validation errors", () => {
@@ -145,15 +165,16 @@ describe("Batch Messages", () => {
         ).rejects.toThrow("messages must be a non-empty array");
       });
 
-      it("should throw error for too many messages (>1000)", async () => {
-        const messages = Array.from({ length: 1001 }, (_, i) => ({
+      it("should throw error for too many messages (>10,000)", async () => {
+        const messages = Array.from({ length: 10001 }, (_, i) => ({
           to: "+15551234567",
           text: `Message ${i}`,
         }));
 
         await expect(client.messages.sendBatch({ messages })).rejects.toThrow(
-          "Maximum 1000 messages per batch",
+          "Maximum 10,000 messages per batch",
         );
+        expect(fetchMock).not.toHaveBeenCalled();
       });
 
       it("should throw ValidationError for invalid phone in batch", async () => {
@@ -314,39 +335,52 @@ describe("Batch Messages", () => {
   });
 
   describe("getBatch()", () => {
-    const mockBatchResponse: BatchMessageResponse = {
-      batchId: "batch_test123",
+    const wireBatch = {
+      id: "batch_test123",
       status: "completed",
       total: 2,
-      queued: 2,
+      queued: 0,
       sent: 2,
+      delivered: 2,
       failed: 0,
-      creditsUsed: 2,
+      creditsReserved: 4,
+      creditsUsed: 4,
+      creditsRefunded: 0,
+      createdAt: "2025-01-15T10:00:00.000Z",
+      completedAt: "2025-01-15T10:00:05.000Z",
       messages: [
         {
           id: "msg_batch1",
           to: "+15551234567",
-          status: "queued",
+          status: "delivered",
+          error: null,
+          createdAt: "2025-01-15T10:00:00.000Z",
+          deliveredAt: "2025-01-15T10:00:03.000Z",
         },
         {
           id: "msg_batch2",
           to: "+15559876543",
-          status: "queued",
+          status: "delivered",
+          error: null,
+          createdAt: "2025-01-15T10:00:00.000Z",
+          deliveredAt: "2025-01-15T10:00:04.000Z",
         },
       ],
-      createdAt: "2025-01-15T10:00:00Z",
-      completedAt: "2025-01-15T10:00:05Z",
     };
+    const mockBatchResponse = { ...wireBatch, batchId: "batch_test123" };
 
     describe("Happy path", () => {
       it("should get batch status by ID", async () => {
-        fetchMock.mockResolvedValue(mockFetchResponse(mockBatchResponse));
+        fetchMock.mockResolvedValue(mockFetchResponse(wireBatch));
 
-        const result = await client.messages.getBatch("batch_test123");
+        const result: BatchMessageResponse =
+          await client.messages.getBatch("batch_test123");
 
         expect(result).toEqual(mockBatchResponse);
         expect(result.batchId).toBe("batch_test123");
         expect(result.status).toBe("completed");
+        expect(result.delivered).toBe(2);
+        expect(result.creditsReserved).toBe(4);
         expect(fetchMock).toHaveBeenCalledWith(
           expect.stringContaining("/v1/messages/batch/batch_test123"),
           expect.objectContaining({
@@ -356,8 +390,8 @@ describe("Batch Messages", () => {
       });
 
       it("should get processing batch", async () => {
-        const processingBatch: BatchMessageResponse = {
-          ...mockBatchResponse,
+        const processingBatch = {
+          ...wireBatch,
           status: "processing",
           sent: 1,
           completedAt: null,
@@ -369,6 +403,7 @@ describe("Batch Messages", () => {
 
         expect(result.status).toBe("processing");
         expect(result.completedAt).toBeNull();
+        expect(result.batchId).toBe("batch_test123");
       });
     });
 
@@ -459,7 +494,7 @@ describe("Batch Messages", () => {
               500,
             ),
           )
-          .mockResolvedValueOnce(mockFetchResponse(mockBatchResponse));
+          .mockResolvedValueOnce(mockFetchResponse(wireBatch));
 
         const result = await client.messages.getBatch("batch_test123");
         expect(result).toEqual(mockBatchResponse);
@@ -470,7 +505,7 @@ describe("Batch Messages", () => {
       it("should retry on network error", async () => {
         fetchMock
           .mockRejectedValueOnce(new Error("Network error"))
-          .mockResolvedValueOnce(mockFetchResponse(mockBatchResponse));
+          .mockResolvedValueOnce(mockFetchResponse(wireBatch));
 
         const result = await client.messages.getBatch("batch_test123");
         expect(result).toEqual(mockBatchResponse);
@@ -479,44 +514,55 @@ describe("Batch Messages", () => {
   });
 
   describe("listBatches()", () => {
-    const mockBatchList: BatchListResponse = {
+    const wireList = {
       data: [
         {
-          batchId: "batch_1",
+          id: "batch_1",
           status: "completed",
           total: 2,
-          queued: 2,
+          queued: 0,
           sent: 2,
+          delivered: 2,
           failed: 0,
-          creditsUsed: 2,
-          messages: [],
-          createdAt: "2025-01-15T10:00:00Z",
-          completedAt: "2025-01-15T10:00:05Z",
+          creditsReserved: 4,
+          creditsUsed: 4,
+          creditsRefunded: 0,
+          createdAt: "2025-01-15T10:00:00.000Z",
+          completedAt: "2025-01-15T10:00:05.000Z",
         },
         {
-          batchId: "batch_2",
+          id: "batch_2",
           status: "processing",
           total: 3,
-          queued: 3,
+          queued: 2,
           sent: 1,
+          delivered: 0,
           failed: 0,
-          creditsUsed: 1,
-          messages: [],
-          createdAt: "2025-01-15T10:05:00Z",
+          creditsReserved: 6,
+          creditsUsed: 2,
+          creditsRefunded: 0,
+          createdAt: "2025-01-15T10:05:00.000Z",
           completedAt: null,
         },
       ],
       count: 2,
     };
+    const mockBatchList = {
+      ...wireList,
+      data: wireList.data.map((batch) => ({ ...batch, batchId: batch.id })),
+    };
 
     describe("Happy path", () => {
       it("should list batches with default options", async () => {
-        fetchMock.mockResolvedValue(mockFetchResponse(mockBatchList));
+        fetchMock.mockResolvedValue(mockFetchResponse(wireList));
 
-        const result = await client.messages.listBatches();
+        const result: BatchListResponse = await client.messages.listBatches();
 
         expect(result).toEqual(mockBatchList);
         expect(result.data).toHaveLength(2);
+        expect(result.data[0].batchId).toBe("batch_1");
+        expect(result.data[1].batchId).toBe("batch_2");
+        expect(result.data[0].messages).toBeUndefined();
         expect(fetchMock).toHaveBeenCalledWith(
           expect.stringContaining("/v1/messages/batches"),
           expect.objectContaining({
@@ -526,7 +572,7 @@ describe("Batch Messages", () => {
       });
 
       it("should list batches with custom limit", async () => {
-        fetchMock.mockResolvedValue(mockFetchResponse(mockBatchList));
+        fetchMock.mockResolvedValue(mockFetchResponse(wireList));
 
         await client.messages.listBatches({ limit: 10 });
 
@@ -535,7 +581,7 @@ describe("Batch Messages", () => {
       });
 
       it("should list batches with offset", async () => {
-        fetchMock.mockResolvedValue(mockFetchResponse(mockBatchList));
+        fetchMock.mockResolvedValue(mockFetchResponse(wireList));
 
         await client.messages.listBatches({ limit: 10, offset: 20 });
 
@@ -544,7 +590,7 @@ describe("Batch Messages", () => {
       });
 
       it("should list batches with status filter", async () => {
-        fetchMock.mockResolvedValue(mockFetchResponse(mockBatchList));
+        fetchMock.mockResolvedValue(mockFetchResponse(wireList));
 
         await client.messages.listBatches({ status: "completed" });
 
@@ -616,7 +662,7 @@ describe("Batch Messages", () => {
               500,
             ),
           )
-          .mockResolvedValueOnce(mockFetchResponse(mockBatchList));
+          .mockResolvedValueOnce(mockFetchResponse(wireList));
 
         const result = await client.messages.listBatches();
         expect(result).toEqual(mockBatchList);
@@ -627,11 +673,207 @@ describe("Batch Messages", () => {
       it("should retry on network error", async () => {
         fetchMock
           .mockRejectedValueOnce(new Error("Network error"))
-          .mockResolvedValueOnce(mockFetchResponse(mockBatchList));
+          .mockResolvedValueOnce(mockFetchResponse(wireList));
 
         const result = await client.messages.listBatches();
         expect(result).toEqual(mockBatchList);
       });
+    });
+  });
+  describe("previewBatch()", () => {
+    const wirePreview = {
+      total: 2,
+      sendable: 2,
+      blocked: 0,
+      duplicates: 0,
+      creditsNeeded: 4,
+      creditBalance: 500,
+      hasSufficientCredits: true,
+      pooled: false,
+      keyType: "live",
+      keyScopes: ["sms:send", "sms:read"],
+      hasWriteScope: true,
+      messagingProfile: {
+        id: "mp_1",
+        canSendDomestic: true,
+        canSendInternational: false,
+        verificationStatus: "verified",
+        verificationType: "toll_free",
+      },
+      byCountry: {
+        US: { count: 2, credits: 4, tier: "domestic", allowed: true },
+      },
+      blockedMessages: [],
+      compliance: {
+        messageType: "transactional",
+        optedOutBlocked: 0,
+        shaftBlocked: 0,
+        quietHoursBlocked: 0,
+        quietHoursRescheduled: 0,
+        shaftBlockedMessages: [],
+        quietHoursBlockedMessages: [],
+      },
+      warnings: [],
+    };
+    const request = {
+      messages: [
+        { to: "+15551234567", text: "Hello User 1!" },
+        { to: "+15559876543", text: "Hello User 2!" },
+      ],
+      messageType: "transactional" as const,
+    };
+
+    it("returns the preview fields and the legacy names derived from them", async () => {
+      fetchMock.mockResolvedValue(mockFetchResponse(wirePreview));
+
+      const preview: BatchPreviewResponse =
+        await client.messages.previewBatch(request);
+
+      expect(preview.total).toBe(2);
+      expect(preview.sendable).toBe(2);
+      expect(preview.creditBalance).toBe(500);
+      expect(preview.byCountry?.US.tier).toBe("domestic");
+      expect(preview.blockedMessages).toEqual([]);
+      expect(preview.canSend).toBe(true);
+      expect(preview.totalMessages).toBe(2);
+      expect(preview.willSend).toBe(2);
+      expect(preview.currentBalance).toBe(500);
+      expect(preview.hasEnoughCredits).toBe(true);
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("/v1/messages/batch/preview"),
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
+
+    it("cannot send without credits, without the sms:send scope, or with nothing sendable", async () => {
+      const cases = [
+        { ...wirePreview, hasSufficientCredits: false },
+        { ...wirePreview, hasWriteScope: false, keyScopes: ["sms:read"] },
+        {
+          ...wirePreview,
+          sendable: 0,
+          blocked: 2,
+          blockedMessages: [
+            { index: 0, to: "+15551234567", reason: "access_denied" },
+            { index: 1, to: "+15559876543", reason: "access_denied" },
+          ],
+        },
+      ];
+
+      for (const body of cases) {
+        fetchMock.mockResolvedValueOnce(mockFetchResponse(body));
+        const preview = await client.messages.previewBatch(request);
+        expect(preview.canSend).toBe(false);
+      }
+    });
+
+    it("cannot send when a message is blocked for a reason other than an opt-out, since the send rejects the whole batch", async () => {
+      const internationalReason =
+        "Your verification does not allow international messaging. Complete international verification to message 200+ countries.";
+      const mixedDestinations = {
+        ...wirePreview,
+        sendable: 1,
+        blocked: 1,
+        creditsNeeded: 2,
+        byCountry: {
+          US: { count: 1, credits: 2, tier: "domestic", allowed: true },
+          GB: {
+            count: 1,
+            credits: 0,
+            tier: "tier1",
+            allowed: false,
+            blockedReason: internationalReason,
+          },
+        },
+        blockedMessages: [
+          { index: 1, to: "+447700900123", reason: internationalReason },
+        ],
+      };
+      const restrictedContent = {
+        ...wirePreview,
+        sendable: 1,
+        blocked: 1,
+        creditsNeeded: 2,
+        byCountry: {
+          US: { count: 2, credits: 2, tier: "domestic", allowed: false, blockedReason: "SHAFT content: cannabis" },
+        },
+        blockedMessages: [
+          { index: 1, to: "+15559876543", reason: "SHAFT content: cannabis" },
+        ],
+        compliance: {
+          ...wirePreview.compliance,
+          shaftBlocked: 1,
+          shaftBlockedMessages: [
+            { index: 1, to: "+15559876543", category: "cannabis", matchedTerms: ["cbd"] },
+          ],
+        },
+        warnings: ["1 message blocked due to SHAFT content violations"],
+      };
+
+      for (const body of [mixedDestinations, restrictedContent]) {
+        fetchMock.mockResolvedValueOnce(mockFetchResponse(body));
+        const preview = await client.messages.previewBatch(request);
+        expect(preview.sendable).toBe(1);
+        expect(preview.willSend).toBe(1);
+        expect(preview.canSend).toBe(false);
+      }
+    });
+
+    it("can send when the only blocked messages are opt-outs, which a send skips", async () => {
+      fetchMock.mockResolvedValue(
+        mockFetchResponse({
+          ...wirePreview,
+          sendable: 1,
+          blocked: 1,
+          creditsNeeded: 2,
+          blockedMessages: [
+            { index: 1, to: "+15559876543", reason: "Contact has opted out (texted STOP)" },
+          ],
+          compliance: { ...wirePreview.compliance, optedOutBlocked: 1 },
+          warnings: ["1 message blocked - contacts opted out (texted STOP)"],
+        }),
+      );
+
+      const preview = await client.messages.previewBatch(request);
+
+      expect(preview.canSend).toBe(true);
+    });
+
+    it("does not need a balance with a test key, whose sends are free", async () => {
+      fetchMock.mockResolvedValue(
+        mockFetchResponse({
+          ...wirePreview,
+          creditBalance: 0,
+          hasSufficientCredits: false,
+          keyType: "test",
+          warnings: ["Using TEST key - messages will be simulated in sandbox mode"],
+        }),
+      );
+
+      const preview = await client.messages.previewBatch(request);
+
+      expect(preview.hasEnoughCredits).toBe(false);
+      expect(preview.canSend).toBe(true);
+    });
+
+    it("previews up to 10,000 messages and rejects more before sending", async () => {
+      fetchMock.mockResolvedValue(mockFetchResponse(wirePreview));
+
+      const within = Array.from({ length: 1001 }, (_, i) => ({
+        to: "+15551234567",
+        text: `Message ${i}`,
+      }));
+      await client.messages.previewBatch({ messages: within });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      const over = Array.from({ length: 10001 }, (_, i) => ({
+        to: "+15551234567",
+        text: `Message ${i}`,
+      }));
+      await expect(client.messages.previewBatch({ messages: over })).rejects.toThrow(
+        "Maximum 10,000 messages per batch",
+      );
+      expect(fetchMock).toHaveBeenCalledTimes(1);
     });
   });
 });

@@ -195,7 +195,9 @@ export class WebhookSignatureError extends Error {
  * @param payload - Raw request body as string (JSON)
  * @param signature - X-Sendly-Signature header value
  * @param secret - Your webhook secret from dashboard
- * @param timestamp - X-Sendly-Timestamp header value (optional, for enhanced verification)
+ * @param timestamp - X-Sendly-Timestamp header value. Required to verify a
+ *   delivery from Sendly: without it only the body is checked, which never
+ *   matches.
  * @param toleranceSeconds - Maximum age of webhook in seconds (default: 300 = 5 minutes)
  * @returns true if signature is valid
  *
@@ -203,16 +205,8 @@ export class WebhookSignatureError extends Error {
  * ```typescript
  * import { verifyWebhookSignature } from '@sendly/node';
  *
- * // Basic verification
  * const isValid = verifyWebhookSignature(
  *   req.body, // raw body string
- *   req.headers['x-sendly-signature'],
- *   process.env.WEBHOOK_SECRET
- * );
- *
- * // With timestamp verification (recommended)
- * const isValid = verifyWebhookSignature(
- *   req.body,
  *   req.headers['x-sendly-signature'],
  *   process.env.WEBHOOK_SECRET,
  *   req.headers['x-sendly-timestamp']
@@ -270,7 +264,7 @@ export function verifyWebhookSignature(
  * @param payload - Raw request body as string
  * @param signature - X-Sendly-Signature header value
  * @param secret - Your webhook secret from dashboard
- * @param timestamp - X-Sendly-Timestamp header value (optional)
+ * @param timestamp - X-Sendly-Timestamp header value (required for a delivery from Sendly)
  * @returns Parsed webhook event
  * @throws {WebhookSignatureError} If signature is invalid
  *
@@ -423,7 +417,7 @@ export class Webhooks {
    * Verify a webhook signature
    * @param payload - Raw request body
    * @param signature - X-Sendly-Signature header
-   * @param timestamp - X-Sendly-Timestamp header (optional)
+   * @param timestamp - X-Sendly-Timestamp header (required for a delivery from Sendly)
    */
   verify(payload: string, signature: string, timestamp?: string): boolean {
     return verifyWebhookSignature(payload, signature, this.secret, timestamp);
@@ -433,7 +427,7 @@ export class Webhooks {
    * Parse and verify a webhook event
    * @param payload - Raw request body
    * @param signature - X-Sendly-Signature header
-   * @param timestamp - X-Sendly-Timestamp header (optional)
+   * @param timestamp - X-Sendly-Timestamp header (required for a delivery from Sendly)
    */
   parse(payload: string, signature: string, timestamp?: string): WebhookEvent {
     return parseWebhookEvent(payload, signature, this.secret, timestamp);
@@ -456,6 +450,10 @@ export class Webhooks {
    * @param payload - Raw request body
    * @param signature - X-Sendly-Signature header
    * @param secret - Your webhook secret
+   * @deprecated Sendly signs `<X-Sendly-Timestamp>.<raw body>`, and this
+   * method takes no timestamp, so it returns false for every real delivery.
+   * Use {@link verifyWebhookSignature} with the timestamp, or
+   * `new Webhooks(secret).verify(payload, signature, timestamp)`.
    */
   static verifySignature(
     payload: string,
@@ -470,6 +468,10 @@ export class Webhooks {
    * @param payload - Raw request body
    * @param signature - X-Sendly-Signature header
    * @param secret - Your webhook secret
+   * @deprecated Sendly signs `<X-Sendly-Timestamp>.<raw body>`, and this
+   * method takes no timestamp, so it throws for every real delivery. Use
+   * {@link parseWebhookEvent} with the timestamp, or
+   * `new Webhooks(secret).parse(payload, signature, timestamp)`.
    */
   static parseEvent(
     payload: string,

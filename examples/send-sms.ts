@@ -19,19 +19,18 @@ async function main() {
     text: 'Hello from Sendly! This is a test message.',
   });
   console.log(`   Message ID: ${message1.id}`);
-  console.log(`   Status: ${message1.status}`);
-  console.log(`   Segments: ${message1.segments}`);
-  console.log(`   Credits Used: ${message1.creditsUsed}\n`);
+  console.log(`   Status: ${message1.status}\n`);
 
-  // Example 2: SMS with custom sender ID (international)
-  console.log('2. Sending SMS with custom sender ID...');
+  // Example 2: Transactional SMS (not held for quiet hours). The sender is
+  // chosen for you; pass `from` only with a number you own.
+  console.log('2. Sending transactional SMS...');
   const message2 = await sendly.messages.send({
     to: SANDBOX_TEST_NUMBERS.SUCCESS,
     text: 'Your verification code is: 123456',
-    from: 'MYAPP',
+    messageType: 'transactional',
   });
   console.log(`   Message ID: ${message2.id}`);
-  console.log(`   From: ${message2.from}\n`);
+  console.log(`   From: ${message2.from} (${message2.senderType})\n`);
 
   // Example 3: Long message (multi-segment)
   console.log('3. Sending long message (multi-segment)...');
@@ -42,7 +41,7 @@ async function main() {
   });
   console.log(`   Message ID: ${message3.id}`);
   console.log(`   Text length: ${longText.length} characters`);
-  console.log(`   Segments: ${message3.segments}\n`);
+  console.log(`   Segments: ${message3.segments} (153 GSM-7 characters each)\n`);
 
   // Example 4: Check rate limit info
   console.log('4. Rate limit info:');

@@ -7,6 +7,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Sendly } from "../src/client";
+import { ValidationError } from "../src/errors";
 import { mockFetchResponse } from "./fixtures/responses";
 
 const LIVE_KEY = "sk_live_v1_secret_key_material";
@@ -135,5 +136,72 @@ describe("path parameter encoding", () => {
     const url = String(fetchMock.mock.calls[0][0]);
     expect(url).toContain("/conversations/conv_123");
     expect(url).toContain("message_limit=10");
+  });
+});
+
+describe("dot-segment ids", () => {
+  let client: Sendly;
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    client = new Sendly("sk_test_v1_valid_key");
+    fetchMock = vi.fn();
+    global.fetch = fetchMock;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it.each(["..", ".", ""])(
+    "refuses %j as a key id before anything is sent, so the workspace is not deleted",
+    async (keyId) => {
+      fetchMock.mockResolvedValue(mockFetchResponse({}));
+
+      await expect(
+        client.enterprise.workspaces.revokeKey("ws_1", keyId),
+      ).rejects.toBeInstanceOf(ValidationError);
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it("refuses a dot-segment contact id instead of deleting the list", async () => {
+    fetchMock.mockResolvedValue(mockFetchResponse({}));
+
+    await expect(
+      client.contacts.lists.removeContact("lst_1", ".."),
+    ).rejects.toBeInstanceOf(ValidationError);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("refuses a dot-segment workspace id on a multipart upload", async () => {
+    fetchMock.mockResolvedValue(mockFetchResponse({}));
+
+    await expect(
+      client.businessUpgrade.start("..", {
+        businessName: "Acme",
+        businessType: "llc",
+      } as never),
+    ).rejects.toBeInstanceOf(ValidationError);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("still sends an ordinary id, and one that only contains dots", async () => {
+    fetchMock
+      .mockResolvedValueOnce(mockFetchResponse({}))
+      .mockResolvedValueOnce(mockFetchResponse({}))
+      .mockResolvedValueOnce(mockFetchResponse(TEMPLATE_BODY));
+
+    await client.enterprise.workspaces.revokeKey("ws_1", "key_1");
+    await client.enterprise.workspaces.revokeKey("ws_1", "...");
+    await client.templates.get("tpl.v2");
+
+    expect(String(fetchMock.mock.calls[0][0])).toContain(
+      "/enterprise/workspaces/ws_1/keys/key_1",
+    );
+    expect(String(fetchMock.mock.calls[1][0])).toContain(
+      "/enterprise/workspaces/ws_1/keys/...",
+    );
+    expect(String(fetchMock.mock.calls[2][0])).toContain("/templates/tpl.v2");
   });
 });

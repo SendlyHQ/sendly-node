@@ -44,10 +44,16 @@ export class SendlyError extends Error {
 
   /**
    * Create a SendlyError from an API response
+   *
+   * @param statusCode - HTTP status of the response
+   * @param response - Error body whose `error` and `message` become the
+   *   error's code and message
+   * @param body - Body kept on `error.response`; defaults to `response`
    */
   static fromResponse(
     statusCode: number,
     response: ApiErrorResponse,
+    body: ApiErrorResponse = response,
   ): SendlyError {
     const message = response.message || "An unknown error occurred";
     const code = response.error || "internal_error";
@@ -62,14 +68,17 @@ export class SendlyError extends Error {
       case "key_revoked":
       case "key_expired":
       case "insufficient_permissions":
-        return new AuthenticationError(message, code, statusCode, response);
+        return new AuthenticationError(message, code, statusCode, body);
 
       case "rate_limit_exceeded":
+      case "too_many_failed_key_attempts":
+      case "too_many_concurrent_verifications":
         return new RateLimitError(
           message,
           response.retryAfter || 60,
           statusCode,
-          response,
+          body,
+          code,
         );
 
       case "insufficient_credits":
@@ -78,18 +87,20 @@ export class SendlyError extends Error {
           response.creditsNeeded || 0,
           response.currentBalance || 0,
           statusCode,
-          response,
+          body,
         );
 
       case "invalid_request":
       case "unsupported_destination":
-        return new ValidationError(message, code, statusCode, response);
+      case "validation_error":
+      case "invalid_code":
+        return new ValidationError(message, code, statusCode, body);
 
       case "not_found":
-        return new NotFoundError(message, statusCode, response);
+        return new NotFoundError(message, statusCode, body);
 
       default:
-        return new SendlyError(message, code, statusCode, response);
+        return new SendlyError(message, code, statusCode, body);
     }
   }
 }
@@ -111,6 +122,14 @@ export class AuthenticationError extends SendlyError {
 
 /**
  * Thrown when rate limit is exceeded
+ *
+ * `code` is `rate_limit_exceeded` for the request limit. It is
+ * `too_many_failed_key_attempts` when repeated wrong API keys from one
+ * address locked the account out for a while: fix the key, then wait
+ * `retryAfter` seconds, since until the lockout ends the right key can be
+ * refused too. It is `too_many_concurrent_verifications` when too many
+ * first-time key checks ran at once; the client retries that one itself
+ * and only throws it once its retries run out.
  */
 export class RateLimitError extends SendlyError {
   /**
@@ -123,8 +142,9 @@ export class RateLimitError extends SendlyError {
     retryAfter: number,
     statusCode?: number,
     response?: ApiErrorResponse,
+    code: SendlyErrorCode = "rate_limit_exceeded",
   ) {
-    super(message, "rate_limit_exceeded", statusCode, response);
+    super(message, code, statusCode, response);
     this.name = "RateLimitError";
     this.retryAfter = retryAfter;
   }

@@ -159,8 +159,8 @@ export interface WhatsAppTemplateSendParams {
  *   caption); also window-bound
  * - `template` — an approved template; works regardless of the window
  *
- * WhatsApp sends require a live API key and a `from` number that has been
- * connected to WhatsApp (see `sendly.whatsapp.signup`).
+ * WhatsApp sends require the `sms:send` scope, a live API key and a `from`
+ * number that has been connected to WhatsApp (see `sendly.whatsapp.signup`).
  */
 export interface SendWhatsAppMessageRequest {
   /**
@@ -274,7 +274,9 @@ export interface WhatsAppMessage {
   from: string;
 
   /**
-   * Body text for free-form text sends; null for template and media sends
+   * Body text for free-form text sends, or the caption for media sends
+   * (pass it as `text` with `mediaUrls`); null for template sends and for
+   * media sent without a caption
    */
   text: string | null;
 
@@ -289,8 +291,14 @@ export interface WhatsAppMessage {
   segments: number;
 
   /**
-   * Credits charged for this message (priced by destination country and
-   * category)
+   * Credits charged for this message. Free-form text or media inside the
+   * 24-hour window: 1 credit each for the first 1,000 per sending number
+   * per calendar month (UTC), then the destination's utility template
+   * price; countries without a listed price use the default utility price
+   * of 12 credits. Templates are priced by category and destination
+   * country; countries without a listed price use 33 (marketing), 12
+   * (utility) and 12 (authentication) credits. A failed send gives its
+   * slot back.
    */
   creditsUsed: number;
 
@@ -693,6 +701,21 @@ export interface SendGroupMessageRequest {
 }
 
 /**
+ * A recipient of a group MMS and its delivery status.
+ */
+export interface GroupRecipient {
+  /**
+   * Recipient in E.164 format.
+   */
+  phoneNumber: string;
+
+  /**
+   * Delivery status for this recipient.
+   */
+  status?: string;
+}
+
+/**
  * Response from sending a group MMS.
  */
 export interface GroupMessageResponse {
@@ -710,6 +733,11 @@ export interface GroupMessageResponse {
    * The recipients the group message was sent to.
    */
   to: string[];
+
+  /**
+   * Each recipient with its delivery status. Present on live sends.
+   */
+  recipients?: GroupRecipient[];
 
   /**
    * Identifier for the group conversation. Present on live sends.
@@ -745,7 +773,7 @@ export type MessageStatus =
 /**
  * How the message was sent
  */
-export type SenderType = "number_pool" | "alphanumeric" | "sandbox";
+export type SenderType = "number_pool" | "alphanumeric" | "sandbox" | "explicit";
 
 /**
  * A sent or received SMS message
@@ -823,8 +851,41 @@ export interface Message {
    * - "number_pool": Sent from toll-free number pool (US/CA)
    * - "alphanumeric": Sent with alphanumeric sender ID (international)
    * - "sandbox": Sent in sandbox/test mode
+   * - "explicit": Sent from a specific number on your account (the `from`
+   *   you passed, or your verified sender)
    */
   senderType?: SenderType;
+
+  /**
+   * True when the send was simulated (test key, or an account not yet set
+   * up to send to this destination) and nothing reached a handset
+   */
+  simulated?: boolean;
+
+  /**
+   * Why a live send was simulated
+   */
+  simulatedReason?: string;
+
+  /**
+   * Dashboard path where you can fix what caused the simulation
+   */
+  actionUrl?: string;
+
+  /**
+   * Message format
+   */
+  messageFormat?: "sms" | "mms" | "whatsapp" | "rcs";
+
+  /**
+   * Media attached to an MMS message
+   */
+  mediaUrls?: string[];
+
+  /**
+   * Batch the message was sent in
+   */
+  batchId?: string | null;
 
   /**
    * @deprecated Internal carrier reference — will be removed from the
@@ -865,6 +926,8 @@ export interface Message {
     intentConfidence: number;
     sentiment: string;
     sentimentConfidence: number;
+    /** One-sentence summary of what the sender wants */
+    summary?: string;
     classifiedAt: string;
     model: string;
   } | null;
@@ -902,9 +965,22 @@ export interface MessageListResponse {
   data: Message[];
 
   /**
-   * Total count of messages returned
+   * Number of messages on this page (not the total; see `pagination.total`)
    */
   count: number;
+
+  /**
+   * Where this page sits in the full result
+   */
+  pagination?: {
+    /** Messages matching the query, across all pages */
+    total: number;
+    limit: number;
+    offset: number;
+    page: number;
+    totalPages: number;
+    hasMore: boolean;
+  };
 }
 
 // ============================================================================
@@ -1381,11 +1457,16 @@ export interface BatchMessageItem {
 }
 
 /**
+ * Most messages one batch can carry
+ */
+export const MAX_BATCH_MESSAGES = 10000;
+
+/**
  * Request payload for sending batch messages
  */
 export interface BatchMessageRequest {
   /**
-   * Array of messages to send (max 1000)
+   * Array of messages to send (max 10,000)
    */
   messages: BatchMessageItem[];
 
@@ -1413,6 +1494,11 @@ export interface BatchMessageRequest {
  * Result for a single message in a batch
  */
 export interface BatchMessageResult {
+  /**
+   * Position of the message in the request (sendBatch only)
+   */
+  index?: number;
+
   /**
    * Message ID
    */
@@ -1454,13 +1540,18 @@ export type BatchStatus =
   | "failed";
 
 /**
- * Response from sending batch messages
+ * A batch and its messages, as returned by {@link MessagesResource.getBatch}
  */
 export interface BatchMessageResponse {
   /**
    * Unique batch identifier
    */
   batchId: string;
+
+  /**
+   * Unique batch identifier (same as `batchId`)
+   */
+  id?: string;
 
   /**
    * Current batch status
@@ -1473,7 +1564,7 @@ export interface BatchMessageResponse {
   total: number;
 
   /**
-   * Number of messages queued successfully
+   * Number of messages waiting to be sent
    */
   queued: number;
 
@@ -1483,14 +1574,44 @@ export interface BatchMessageResponse {
   sent: number;
 
   /**
+   * Number of messages delivered
+   */
+  delivered?: number;
+
+  /**
    * Number of messages that failed
    */
   failed: number;
 
   /**
+   * Number of messages being retried (sendBatch only)
+   */
+  retrying?: number;
+
+  /**
+   * Recipients skipped because they opted out (sendBatch only)
+   */
+  optedOutSkipped?: number;
+
+  /**
+   * Recipients skipped because their number can't receive SMS (sendBatch only)
+   */
+  invalidSkipped?: number;
+
+  /**
+   * Credits reserved when the batch was accepted
+   */
+  creditsReserved?: number;
+
+  /**
    * Total credits used
    */
   creditsUsed: number;
+
+  /**
+   * Credits returned for messages that failed
+   */
+  creditsRefunded?: number;
 
   /**
    * Individual message results
@@ -1506,6 +1627,28 @@ export interface BatchMessageResponse {
    * When the batch completed (if applicable)
    */
   completedAt?: string | null;
+}
+
+/**
+ * Response from {@link MessagesResource.sendBatch}. A batch that is still
+ * processing has `status: "processing"` and an empty `messages` array;
+ * poll {@link MessagesResource.getBatch} for the outcome.
+ */
+export interface BatchSendResponse
+  extends Omit<BatchMessageResponse, "queued" | "createdAt"> {
+  /** @deprecated Not returned when sending; read it from getBatch */
+  queued?: number;
+  /** @deprecated Not returned when sending; read it from getBatch */
+  createdAt?: string;
+}
+
+/**
+ * A batch as listed by {@link MessagesResource.listBatches}, without its
+ * messages
+ */
+export interface BatchSummary extends Omit<BatchMessageResponse, "messages"> {
+  /** @deprecated Not returned by listBatches; call getBatch for the messages */
+  messages?: BatchMessageResult[];
 }
 
 /**
@@ -1537,7 +1680,7 @@ export interface BatchListResponse {
   /**
    * Array of batches
    */
-  data: BatchMessageResponse[];
+  data: BatchSummary[];
 
   /**
    * Total count of batches
@@ -1585,22 +1728,29 @@ export interface BatchPreviewItem {
  */
 export interface BatchPreviewResponse {
   /**
-   * Whether the batch can be sent
+   * Whether nothing the preview found stops a send: at least one message is
+   * sendable, none is blocked except by an opt-out, the balance covers it
+   * (not needed with a test key, whose sends are free), and the API key has
+   * the `sms:send` scope. A send skips opted-out recipients but rejects the
+   * whole batch if any other message is blocked. A test key's send skips the
+   * destination and verification checks, so it can go through while
+   * `canSend` is false.
    */
   canSend: boolean;
 
   /**
-   * Total number of messages
+   * Total number of messages (same as `total`)
    */
   totalMessages: number;
 
   /**
-   * Number of messages that will be sent
+   * Number of messages that pass the preview's checks (same as `sendable`);
+   * see `canSend` for whether a send of the batch goes through
    */
   willSend: number;
 
   /**
-   * Number of messages that will be blocked
+   * Number of messages the preview blocks, opted-out recipients included
    */
   blocked: number;
 
@@ -1610,22 +1760,129 @@ export interface BatchPreviewResponse {
   creditsNeeded: number;
 
   /**
-   * Current credit balance
+   * Current credit balance (same as `creditBalance`)
    */
   currentBalance: number;
 
   /**
-   * Whether user has enough credits
+   * Whether user has enough credits (same as `hasSufficientCredits`)
    */
   hasEnoughCredits: boolean;
 
   /**
-   * Per-message preview details
+   * Total number of messages in the request
    */
-  messages: BatchPreviewItem[];
+  total?: number;
 
   /**
-   * Summary of why messages are blocked (if any)
+   * Number of messages that pass the preview's checks
+   */
+  sendable?: number;
+
+  /**
+   * Repeated numbers, which are sent once
+   */
+  duplicates?: number;
+
+  /**
+   * Current credit balance
+   */
+  creditBalance?: number;
+
+  /**
+   * Whether the balance covers `creditsNeeded`
+   */
+  hasSufficientCredits?: boolean;
+
+  /**
+   * Whether the balance is a shared enterprise credit pool
+   */
+  pooled?: boolean;
+
+  /**
+   * Type of the API key used for the preview
+   */
+  keyType?: "test" | "live";
+
+  /**
+   * Scopes of the API key used for the preview
+   */
+  keyScopes?: string[];
+
+  /**
+   * Whether the API key has the `sms:send` scope needed to send
+   */
+  hasWriteScope?: boolean;
+
+  /**
+   * What the workspace's verification lets it send to
+   */
+  messagingProfile?: {
+    canSendDomestic: boolean;
+    canSendInternational: boolean;
+    verificationStatus: string | null;
+    verificationType: string | null;
+  };
+
+  /**
+   * Messages and credits per destination country
+   */
+  byCountry?: Record<
+    string,
+    {
+      count: number;
+      credits: number;
+      tier: string;
+      allowed: boolean;
+      blockedReason?: string;
+    }
+  >;
+
+  /**
+   * Each message that will not be sent, and why
+   */
+  blockedMessages?: Array<{
+    index: number;
+    to: string;
+    reason: string;
+  }>;
+
+  /**
+   * Content and quiet-hours checks
+   */
+  compliance?: {
+    messageType: MessageType;
+    optedOutBlocked?: number;
+    shaftBlocked: number;
+    quietHoursBlocked: number;
+    quietHoursRescheduled: number;
+    shaftBlockedMessages: Array<{
+      index: number;
+      to: string;
+      category: string;
+      matchedTerms: string[];
+    }>;
+    quietHoursBlockedMessages: Array<{
+      index: number;
+      to: string;
+      recipientTimezone: string;
+      recipientLocalTime: string;
+      nextAllowedTime?: string;
+    }>;
+  };
+
+  /**
+   * Warnings that do not block sending
+   */
+  warnings?: string[];
+
+  /**
+   * @deprecated Not returned by the API; see `blockedMessages`
+   */
+  messages?: BatchPreviewItem[];
+
+  /**
+   * @deprecated Not returned by the API; see `blockedMessages`
    */
   blockReasons?: Record<string, number>;
 }
@@ -1785,14 +2042,47 @@ export type SendlyErrorCode =
   | "unsupported_destination"
   | "not_found"
   | "rate_limit_exceeded"
+  | "too_many_failed_key_attempts"
+  | "too_many_concurrent_verifications"
   | "whatsapp_not_enabled"
+  | "whatsapp_unavailable"
+  | "whatsapp_signup_limit_reached"
   | "whatsapp_requires_live_key"
   | "whatsapp_sender_not_connected"
   | "whatsapp_window_closed"
   | "whatsapp_template_not_found"
   | "whatsapp_template_not_approved"
   | "whatsapp_invalid_content"
+  /** WhatsApp refused the message (422, final) or provably never received it (502, safe to send again) */
   | "whatsapp_send_failed"
+  /** The outcome of a WhatsApp send is unknown (409): marked failed and refunded, but it may still be delivered */
+  | "whatsapp_send_unconfirmed"
+  | "file_required"
+  | "whatsapp_profile_photo_invalid"
+  | "whatsapp_profile_photo_too_large"
+  | "whatsapp_profile_update_failed"
+  | "whatsapp_conversational_components_fetch_failed"
+  | "whatsapp_conversational_components_update_failed"
+  | "whatsapp_calling_unavailable"
+  | "whatsapp_calling_update_failed"
+  | "display_name_required"
+  | "whatsapp_business_account_not_found"
+  | "whatsapp_signup_in_progress"
+  | "whatsapp_already_enabled"
+  | "whatsapp_verification_in_progress"
+  | "whatsapp_verification_start_failed"
+  | "invalid_verification_code"
+  /** Wrong WhatsApp verification code; `response.attemptsRemaining` says how many tries are left */
+  | "whatsapp_verification_code_invalid"
+  | "whatsapp_verification_failed"
+  | "whatsapp_verification_busy"
+  | "whatsapp_verification_unavailable"
+  | "whatsapp_activation_pending"
+  /** Too soon to send another WhatsApp code; `response.retryAfter` is the wait in seconds */
+  | "whatsapp_verification_resend_too_soon"
+  | "whatsapp_verification_resend_failed"
+  | "signup_not_active"
+  | "signup_not_found"
   | "rcs_not_enabled"
   | "rcs_requires_live_key"
   | "rcs_agent_not_ready"
@@ -1838,9 +2128,22 @@ export type SendlyErrorCode =
   | "sms_fallback_failed"
   | "recipient_opted_out"
   | "compliance_blocked"
+  | "validation_error"
+  | "conflict"
+  | "verification_required"
+  | "credits_required"
+  /** Wrong verification code; `response.remaining_attempts` says how many tries are left */
+  | "invalid_code"
+  /** The verification code expired (HTTP 410) */
+  | "expired"
+  /** No verification attempts are left (HTTP 429, not a rate limit) */
+  | "max_attempts_exceeded"
+  | "invalid_number"
+  | "from_number_not_supported"
   | "internal_error"
   /** The response did not come from the Sendly API (wrong baseUrl, or a proxy intercepted it) */
-  | "invalid_response";
+  | "invalid_response"
+  | (string & {});
 
 /**
  * One field-level problem reported alongside a validation error
@@ -1890,6 +2193,17 @@ export interface ApiErrorResponse {
    * Field-level detail (for validation errors such as rcs_invalid_content)
    */
   errors?: ApiFieldError[];
+
+  /**
+   * Attempts left after a wrong code (invalid_code errors from verify.check)
+   */
+  remaining_attempts?: number;
+
+  /**
+   * Attempts left after a wrong code (whatsapp_verification_code_invalid
+   * errors from whatsapp.signup.verify)
+   */
+  attemptsRemaining?: number;
 
   /**
    * Additional error context
@@ -1955,6 +2269,14 @@ export interface RequestOptions {
    * A caller-supplied idempotencyKey is always sent regardless.
    */
   autoIdempotencyKey?: boolean;
+
+  /**
+   * Set to true to retry only a request the API provably never ran (a 429
+   * `too_many_concurrent_verifications`). A 5xx, a timeout or a network
+   * error is thrown at once. Used for calls that change state on every
+   * attempt, such as submitting a WhatsApp verification code.
+   */
+  retryUnsentOnly?: boolean;
 }
 
 /**
@@ -1970,10 +2292,10 @@ export interface IdempotentRequestOptions {
    * retry loops — repeating a request with the same key within 24 hours
    * returns the original response instead of executing again.
    *
-   * Note: a response is cached under the key once the original attempt
-   * completes, including error responses — retrying a failed request with
-   * the same key returns the recorded failure; use a fresh key to
-   * re-execute.
+   * Note: a 2xx response, or a 4xx other than a 429, is recorded under the
+   * key once the original attempt completes, and repeating the request with
+   * the same key returns it; use a fresh key to run a refused request again.
+   * A 5xx or a 429 is never recorded, so retry it under the same key.
    *
    * @example
    * ```typescript
@@ -2300,7 +2622,10 @@ export interface WebhookCreatedResponse extends Webhook {
  * Options for creating a webhook
  */
 export interface CreateWebhookOptions {
-  /** HTTPS endpoint URL */
+  /**
+   * HTTPS endpoint URL. A test key can only register localhost or a tunnel
+   * host such as ngrok, loca.lt or webhook.site.
+   */
   url: string;
   /** Event types to subscribe to */
   events: WebhookEventType[];
@@ -2432,6 +2757,48 @@ export interface WebhookDelivery {
   createdAt: string;
   /** When delivery succeeded (ISO 8601) */
   deliveredAt?: string;
+  /** Whether the endpoint accepted the delivery */
+  success?: boolean;
+  /** HTTP status code from the endpoint, 0 when it did not answer */
+  httpStatus?: number;
+  /** Response body from the endpoint */
+  responseBody?: string | null;
+}
+
+/**
+ * An event type you can subscribe a webhook to, with what it means
+ */
+export interface WebhookEventTypeDetail {
+  /** Event type name */
+  type: WebhookEventType;
+  /** What the event reports */
+  description: string;
+}
+
+/**
+ * The test delivery sent by {@link WebhooksResource.test}
+ */
+export interface WebhookTestDelivery {
+  /** Delivery ID (del_xxx) */
+  id: string;
+  /** Delivery ID (same as `id`) */
+  deliveryId?: string;
+  /** URL the test event was sent to */
+  webhookUrl?: string;
+  /** Always "webhook.test" */
+  eventType: string;
+  /** Delivery status */
+  status: DeliveryStatus;
+  /** Response time in milliseconds */
+  responseTime?: number;
+  /** HTTP status code from the endpoint */
+  statusCode?: number;
+  /** Start of the response body from the endpoint */
+  responseBody?: string;
+  /** Error message if the delivery failed */
+  error?: string;
+  /** When the delivery succeeded (ISO 8601) */
+  deliveredAt?: string;
 }
 
 /**
@@ -2446,19 +2813,37 @@ export interface WebhookTestResult {
   responseTimeMs?: number;
   /** Error message if failed */
   error?: string;
+  /** Summary of the result */
+  message?: string;
+  /** The test delivery */
+  delivery?: WebhookTestDelivery;
 }
 
 /**
  * Response from rotating webhook secret
  */
 export interface WebhookSecretRotation {
-  /** The webhook */
-  webhook: Webhook;
+  /** @deprecated Not returned by the API; always undefined */
+  webhook?: Webhook;
   /** New signing secret */
   newSecret: string;
-  /** When old secret expires (ISO 8601) */
-  oldSecretExpiresAt: string;
-  /** Message about grace period */
+  /** New signing secret (same value as `newSecret`) */
+  secret?: string;
+  /**
+   * The webhook's secret version as the API reports it. Rotating through
+   * the API does not change it, so it does not count rotations.
+   */
+  newSecretVersion?: number;
+  /** When the secret was rotated (ISO 8601) */
+  rotatedAt?: string;
+  /**
+   * Grace period the API reports, in hours. Deliveries are signed with the
+   * new secret as soon as the rotation returns.
+   */
+  gracePeriodHours?: number;
+  /** @deprecated Not returned by the API; always undefined */
+  oldSecretExpiresAt?: string;
+  /** Message about the rotation */
   message: string;
 }
 
@@ -2478,6 +2863,39 @@ export interface Account {
   name?: string;
   /** Account creation date (ISO 8601) */
   createdAt: string;
+  /** The workspace the API key belongs to, or `null` when it has none */
+  organization?: {
+    id: string;
+    name: string;
+    isPersonal: boolean;
+  } | null;
+  /** Credit balance of the key's workspace */
+  credits?: {
+    balance: number;
+    reservedBalance: number;
+  };
+  /** Business verification of the key's workspace, or `null` when there is none */
+  verification?: {
+    status: string;
+    type: string | null;
+    region: string | null;
+    submittedAt: string | null;
+    updatedAt: string | null;
+  } | null;
+  /** The API key that made the request */
+  apiKey?: {
+    id: string;
+    name: string;
+    type: "test" | "live";
+    scopes: string[];
+    createdAt?: string;
+    lastUsedAt?: string | null;
+  };
+  /** Sending limits for the API key */
+  limits?: {
+    messagesPerMinute: number;
+    messagesPerDay: number;
+  };
 }
 
 /**
@@ -2498,8 +2916,21 @@ export interface Credits {
 export interface CreditTransaction {
   /** Transaction ID */
   id: string;
-  /** Transaction type */
-  type: "purchase" | "usage" | "refund" | "adjustment" | "bonus";
+  /**
+   * Transaction type. Auto-recharges are recorded as `purchase`, and
+   * `adjustment` is never recorded; any type added later arrives as its
+   * own string.
+   */
+  type:
+    | "purchase"
+    | "usage"
+    | "refund"
+    | "adjustment"
+    | "bonus"
+    | "transfer"
+    | "admin_grant"
+    | "admin_seed"
+    | (string & {});
   /** Amount (positive for credits in, negative for credits out) */
   amount: number;
   /** Balance after transaction */
@@ -2531,10 +2962,14 @@ export interface ApiKey {
   type: "test" | "live";
   /** Key prefix (for identification) */
   prefix: string;
-  /** Last 4 characters of key */
-  lastFour: string;
-  /** Permissions granted */
+  /** @deprecated No endpoint returns the last four characters; always undefined */
+  lastFour?: string;
+  /** Permissions granted (the key's scopes) */
   permissions: string[];
+  /** The key's scopes */
+  scopes?: string[];
+  /** Whether the key is active */
+  isActive?: boolean;
   /** When key was created (ISO 8601) */
   createdAt: string;
   /** When key was last used (ISO 8601) */
@@ -2625,7 +3060,8 @@ export const SANDBOX_TEST_NUMBERS = {
 // ============================================================================
 
 /**
- * Verification status
+ * Verification status. The API returns `pending`, `verified`, `expired` and
+ * `failed`; `invalid` is never returned.
  */
 export type VerificationStatus =
   | "pending"
@@ -2701,7 +3137,10 @@ export interface CheckVerificationResponse {
   phone: string;
   /** When verified (ISO 8601) */
   verifiedAt?: string;
-  /** Remaining attempts (if invalid) */
+  /**
+   * @deprecated Never set: a wrong code throws an `invalid_code` error
+   * instead. Read `error.response.remaining_attempts`.
+   */
   remainingAttempts?: number;
 }
 
@@ -2843,13 +3282,17 @@ export interface TemplateListResponse {
 export interface TemplatePreview {
   /** Template ID */
   id: string;
-  /** Template name */
-  name: string;
+  /** @deprecated Not returned by the preview endpoint; always undefined */
+  name?: string;
   /** Original text with variables */
   originalText: string;
   /** Interpolated text with sample values */
   previewText: string;
-  /** Variables detected */
+  /** Number of characters in the preview text */
+  characterCount?: number;
+  /** Number of SMS segments the preview text needs */
+  segmentCount?: number;
+  /** Variables detected (the preview endpoint does not list them, so this is empty) */
   variables: TemplateVariable[];
 }
 
@@ -2906,12 +3349,15 @@ export interface ValidateSessionTokenResponse {
 // ============================================================================
 
 /**
- * Campaign status values
+ * Campaign status values. A campaign that has been sent is `completed`.
+ * `sent` and `paused` are never returned; as a list filter, `sent` matches
+ * completed campaigns.
  */
 export type CampaignStatus =
   | "draft"
   | "scheduled"
   | "sending"
+  | "completed"
   | "sent"
   | "paused"
   | "cancelled"
@@ -2969,7 +3415,7 @@ export interface CreateCampaignRequest {
   text: string;
   /** Template ID to use (optional) */
   templateId?: string;
-  /** Contact list IDs to send to */
+  /** The contact list to send to, as a one-element array (a campaign targets one list) */
   contactListIds: string[];
 }
 
@@ -2983,7 +3429,7 @@ export interface UpdateCampaignRequest {
   text?: string;
   /** Template ID */
   templateId?: string | null;
-  /** Contact list IDs */
+  /** The contact list to send to, as a one-element array (a campaign targets one list) */
   contactListIds?: string[];
 }
 
@@ -3005,15 +3451,28 @@ export interface CampaignPreview {
   id: string;
   /** Total recipients */
   recipientCount: number;
-  /** Estimated segments (based on message length) */
-  estimatedSegments: number;
+  /** @deprecated Not returned by the preview endpoint; always undefined */
+  estimatedSegments?: number;
   /** Estimated credits needed */
   estimatedCredits: number;
   /** Current credit balance */
   currentBalance: number;
   /** Whether user has enough credits */
   hasEnoughCredits: boolean;
-  /** Breakdown by country/pricing tier */
+  /** Contacts on the list that opted out and will be skipped */
+  optedOutCount?: number;
+  /** Contacts with a missing or malformed phone number */
+  invalidCount?: number;
+  /** Contacts skipped because their number was flagged as unable to receive SMS */
+  invalidNumberCount?: number;
+  /** Contacts skipped because their number is a landline */
+  landlineCount?: number;
+  /** Up to five of the recipients */
+  sampleRecipients?: Array<{ phone: string; name?: string }>;
+  /**
+   * Breakdown by country, from `byCountry`. `creditsPerMessage` is the
+   * average for that country.
+   */
   breakdown?: Array<{
     country: string;
     count: number;
@@ -3043,6 +3502,38 @@ export interface CampaignPreview {
     verificationType: string | null;
     verificationStatus: string | null;
   };
+}
+
+/**
+ * Result of {@link CampaignsResource.send}: the batch the campaign's
+ * messages went out in. Call {@link CampaignsResource.get} for the campaign
+ * itself.
+ */
+export interface CampaignSendResult {
+  /** The campaign that was sent */
+  id: string;
+  /** Batch the messages were sent in; see {@link MessagesResource.getBatch} */
+  batchId: string;
+  /** Status of that batch */
+  status: BatchStatus;
+  /** Messages in the batch */
+  recipientCount: number;
+  /** Messages sent */
+  sentCount: number;
+  /** Messages that failed */
+  failedCount: number;
+  /** Messages being retried */
+  retryingCount?: number;
+  /** Credits used */
+  creditsUsed: number;
+  /** Credits returned for messages that failed */
+  creditsRefunded: number;
+  /** Recipients skipped because they opted out */
+  optedOutSkipped: number;
+  /** Recipients skipped because their number can't receive SMS */
+  invalidSkipped: number;
+  /** Each message in the batch (empty while the batch is processing) */
+  messages: BatchMessageResult[];
 }
 
 /**
@@ -3455,13 +3946,65 @@ export interface CreateWorkspaceOptions {
   description?: string;
 }
 
+/**
+ * Business entity type of a verification
+ */
+export type VerificationEntityType =
+  | "SOLE_PROPRIETOR"
+  | "PRIVATE_PROFIT"
+  | "PUBLIC_PROFIT"
+  | "NON_PROFIT"
+  | "GOVERNMENT";
+
+/**
+ * Changes to apply to a verification copied from another workspace
+ */
+export interface ProvisionVerificationOverrides {
+  businessName?: string;
+  doingBusinessAs?: string;
+  website?: string;
+  entityType?: VerificationEntityType;
+  useCase?: string;
+  useCaseSummary?: string;
+  sampleMessages?: string;
+  monthlyVolume?: string;
+  additionalInformation?: string;
+  brn?: string;
+  brnType?: string;
+  brnCountry?: string;
+  contact?: {
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    phone?: string;
+  };
+  address?: {
+    addr1?: string;
+    addr2?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+    country?: string;
+  };
+}
+
 export interface ProvisionWorkspaceOptions {
   name: string;
   sourceWorkspaceId?: string;
   inheritWithNewNumber?: boolean;
+  /**
+   * Changes to the copied verification. Applied when inheriting with a new
+   * number (`sourceWorkspaceId` with `inheritWithNewNumber: true`).
+   */
+  verificationOverrides?: ProvisionVerificationOverrides;
+  /**
+   * Business details for a workspace with its own verification. `brn` is
+   * required, and `website` is required unless `generateBusinessPage` is true.
+   */
   verification?: {
     businessName: string;
-    website: string;
+    doingBusinessAs?: string;
+    website?: string;
     address: {
       street: string;
       city: string;
@@ -3478,12 +4021,17 @@ export interface ProvisionWorkspaceOptions {
     brn?: string;
     brnType?: string;
     brnCountry?: string;
+    entityType?: VerificationEntityType;
     useCase: string;
     useCaseSummary: string;
     sampleMessages: string;
-    optInWorkflow: string;
+    optInWorkflow?: string;
     optInImageUrls?: string;
     monthlyVolume?: string;
+    additionalInformation?: string;
+    ageGatedContent?: boolean;
+    privacyUrl?: string;
+    termsUrl?: string;
   };
   creditAmount?: number;
   creditSourceWorkspaceId?: string;
@@ -3503,6 +4051,11 @@ export interface ProvisionWorkspaceResult {
   verification?: {
     id: string;
     status: string;
+    /**
+     * Verification type, such as `toll_free`. Only an inherited verification
+     * carries it; when the workspace got its own verification (`inherited`
+     * is false), it is undefined.
+     */
     type: string;
     tollFreeNumber: string | null;
     inherited?: boolean;
@@ -3511,6 +4064,8 @@ export interface ProvisionWorkspaceResult {
   credits?: {
     balance: number;
     transferred?: number;
+    /** Set instead of the other fields when the credit transfer failed */
+    error?: string;
   };
   key?: {
     id: string;
@@ -3520,20 +4075,57 @@ export interface ProvisionWorkspaceResult {
     type: string;
   };
   optInPage?: {
+    id?: string;
     url: string;
     slug: string;
-    pageId: string;
+    /** @deprecated Not returned by the API; use `id` */
+    pageId?: string;
+    /** Set instead of the other fields when the page could not be created */
+    error?: string;
   };
   legalPages?: {
     privacyUrl?: string;
     termsUrl?: string;
+    privacyPageId?: string;
+    termsPageId?: string;
+    /** Set instead of the other fields when the pages could not be created */
+    error?: string;
+  };
+  /** The generated business page, when `generateBusinessPage` was set */
+  businessPage?: {
+    id: string;
+    slug: string;
+    url: string;
+    /** Set instead of the other fields when the page could not be created */
+    error?: string;
   };
   webhook?: {
-    id: string;
+    /** @deprecated Not returned by the API; always undefined */
+    id?: string;
     url: string;
+    /** Set instead of `url` when the webhook could not be saved */
+    error?: string;
   };
   apiBaseUrl?: string;
   dashboardUrl?: string;
+}
+
+/**
+ * Result of giving a workspace another workspace's verification
+ */
+export interface InheritVerificationResult {
+  /** The workspace's verification */
+  verificationId: string;
+  /** Verification status */
+  status: string;
+  /** Verification type (e.g. "toll_free") */
+  type: string;
+  /** The workspace's toll-free number, if it has one yet */
+  tollFreeNumber: string | null;
+  /** The workspace the verification came from */
+  inheritedFrom: string;
+  /** True when a new toll-free number was ordered for the workspace */
+  newNumber?: boolean;
 }
 
 export interface TransferCreditsOptions {
@@ -3548,8 +4140,11 @@ export interface TransferCreditsResult {
 }
 
 export interface CreateKeyOptions {
+  /** Display name for the key (defaults to "API key") */
   name?: string;
   type?: "live" | "test";
+  /** Scopes to grant the key (defaults to every scope) */
+  scopes?: string[];
 }
 
 export interface CreatedApiKey {
@@ -3557,6 +4152,8 @@ export interface CreatedApiKey {
   name: string;
   key: string;
   keyPrefix: string;
+  type?: "live" | "test";
+  scopes?: string[];
   createdAt: string;
 }
 
@@ -3567,6 +4164,27 @@ export interface WorkspaceCredits {
 
 export interface EnterpriseWebhook {
   url: string;
+  /** Event types delivered, or `null` for all */
+  events?: string[] | null;
+  /** Workspaces whose events are delivered, or `null` for all */
+  workspaces?: string[] | null;
+  /**
+   * Secret to verify deliveries with. Returned only by the first `set()`,
+   * when the secret is created; store it then.
+   */
+  signingSecret?: string;
+}
+
+/**
+ * Result of rotating the enterprise webhook signing secret
+ */
+export interface EnterpriseWebhookSecretRotation {
+  success: boolean;
+  /** The new signing secret. Shown only once; store it now. */
+  secret: string;
+  /** When the secret was rotated (ISO 8601) */
+  rotatedAt: string;
+  message: string;
 }
 
 export interface EnterpriseWebhookTestResult {
@@ -3614,7 +4232,17 @@ export interface CreditAnalyticsDataPoint {
 }
 
 export interface CreditAnalytics {
+  /** The period asked for. The totals are current and do not depend on it. */
   period: string;
+  /** Credits held across your workspaces */
+  totalBalance?: number;
+  /** Credits ever added across your workspaces */
+  totalLifetime?: number;
+  /** Credits used (`totalLifetime` minus `totalBalance`) */
+  totalUsed?: number;
+  /** Number of workspaces counted */
+  workspaceCount?: number;
+  /** @deprecated The API returns totals, not a daily series; always empty */
   data: CreditAnalyticsDataPoint[];
 }
 
@@ -3881,8 +4509,12 @@ export interface ShortCodeApplication {
   brandRegistrationStatus: string;
   contentProviderRegistrationStatus: string;
   submittedAt: string | null;
+  /** When Sendly finished reviewing the application */
+  reviewedAt?: string | null;
   filedAt: string | null;
   activatedAt: string | null;
+  /** When the registry registration is next due to be re-vetted */
+  registryRevettingDueAt?: string | null;
   createdAt: string | null;
   updatedAt: string | null;
 }
@@ -3900,13 +4532,28 @@ export interface ShortCodeApplicationView {
   quote: {
     codeType: "random" | "vanity";
     monthlyUsd: number | null;
+    /** One-time setup fee, in US dollars */
+    setupUsd?: number;
     currency: "USD";
     autoBilled: false;
+  };
+  /** Whether the workspace's business is verified, which the application needs */
+  verification?: {
+    verified: boolean;
+    state: "verified" | "in_review" | "needs_attention" | "not_started";
+    href: string;
   };
   carriers: {
     approved: number;
     total: number;
     overall: "not_submitted" | "in_progress" | "approved" | "rejected";
+    /** Where each carrier's certification stands */
+    byCarrier?: Array<{
+      carrier: string;
+      label: string;
+      status: "not_submitted" | "submitted" | "in_review" | "approved" | "rejected";
+      updatedAt: string | null;
+    }>;
   };
   submitted?: boolean;
   alreadySubmitted?: boolean;
@@ -3929,6 +4576,8 @@ export interface ShortCode {
   shortCode: string | null;
   countryCode: string;
   status: string;
+  /** Where Sendly's review of the application stands */
+  reviewStatus?: string;
   useCase: string;
   createdAt: string;
 }
