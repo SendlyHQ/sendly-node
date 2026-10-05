@@ -137,10 +137,14 @@ class WorkspacesSubResource {
     return transformKeys<EnterpriseWorkspaceDetail>(response);
   }
 
-  async delete(workspaceId: string): Promise<void> {
+  async delete(
+    workspaceId: string,
+    options: { releaseNumbers?: boolean } = {},
+  ): Promise<void> {
     await this.http.request<void>({
       method: "DELETE",
       path: `/enterprise/workspaces/${encodeURIComponent(workspaceId)}`,
+      ...(options.releaseNumbers ? { query: { release_numbers: true } } : {}),
     });
   }
 

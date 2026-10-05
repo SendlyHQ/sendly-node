@@ -360,4 +360,26 @@ describe("Enterprise resource", () => {
       expect(fetchMock).not.toHaveBeenCalled();
     });
   });
+  describe("workspaces.delete()", () => {
+    it("sends no release flag by default", async () => {
+      fetchMock.mockResolvedValue(mockFetchResponse({ success: true }));
+
+      await client.enterprise.workspaces.delete("org_ws");
+
+      const url = String(fetchMock.mock.calls[0][0]);
+      expect(fetchMock.mock.calls[0][1].method).toBe("DELETE");
+      expect(url).toContain("/v1/enterprise/workspaces/org_ws");
+      expect(url).not.toContain("release_numbers");
+    });
+
+    it("asks the API to release the workspace's numbers when told to", async () => {
+      fetchMock.mockResolvedValue(mockFetchResponse({ success: true }));
+
+      await client.enterprise.workspaces.delete("org_ws", { releaseNumbers: true });
+
+      const url = new URL(String(fetchMock.mock.calls[0][0]));
+      expect(url.pathname).toContain("/v1/enterprise/workspaces/org_ws");
+      expect(url.searchParams.get("release_numbers")).toBe("true");
+    });
+  });
 });

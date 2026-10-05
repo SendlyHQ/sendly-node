@@ -373,7 +373,7 @@ a `5xx` or the key-check `429`. The exception is `sendBatch`, which sends a key
 only when you pass `idempotencyKey`; without one, the API dedupes a retried
 batch by its content. On the endpoints that deduplicate (sends, batch, group,
 schedule, conversation replies, draft approval, verify, number purchase, credit
-transfers, enterprise deposits and provisioning, WhatsApp signup and template
+transfers, enterprise provisioning, WhatsApp signup and template
 creation, calls, and RCS and short-code writes), a retry of a request that
 already reached the API returns the original result instead of sending and
 charging again. The API never records a `5xx` or a `429` under a key, so a
@@ -2218,9 +2218,10 @@ const bulk = await client.enterprise.workspaces.provisionBulk([
 ]);
 console.log(bulk.summary.succeeded, bulk.results.map((r) => `${r.name}: ${r.status}`));
 
-// Delete a workspace
+// Delete a workspace. A workspace that still has phone numbers is refused
+// with 409 workspace_has_numbers unless you ask for them to be released.
 const dallas = bulk.results[0];
-if (dallas.workspaceId) await client.enterprise.workspaces.delete(dallas.workspaceId);
+if (dallas.workspaceId) await client.enterprise.workspaces.delete(dallas.workspaceId, { releaseNumbers: true });
 ```
 
 ### Verification
