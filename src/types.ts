@@ -2140,6 +2140,25 @@ export type SendlyErrorCode =
   | "max_attempts_exceeded"
   | "invalid_number"
   | "from_number_not_supported"
+  /** No card on file for a fee (HTTP 402); `response.nextStep` is `add_payment_method` */
+  | "payment_method_required"
+  /** The card was declined for a fee (HTTP 402); `response.nextStep` is `update_payment_method` */
+  | "payment_failed"
+  /** The bank wants the payment confirmed (HTTP 402); open `response.checkoutUrl` */
+  | "payment_requires_authentication"
+  | "short_code_invalid_application"
+  | "short_code_ai_draft_unedited"
+  | "short_code_locked"
+  | "short_code_conflict"
+  /** Another payment for the application is still running (HTTP 409) */
+  | "short_code_payment_in_progress"
+  /** The card processor didn't confirm the setup fee (HTTP 503); submit again later */
+  | "short_code_payment_unconfirmed"
+  /** The setup fee was charged but couldn't be recorded, so it was refunded (HTTP 500) */
+  | "short_code_payment_not_recorded"
+  /** A refund of the setup fee is still going through (HTTP 409) */
+  | "short_code_refund_pending"
+  | "short_codes_not_enabled"
   | "internal_error"
   /** The response did not come from the Sendly API (wrong baseUrl, or a proxy intercepted it) */
   | "invalid_response"
@@ -2204,6 +2223,23 @@ export interface ApiErrorResponse {
    * errors from whatsapp.signup.verify)
    */
   attemptsRemaining?: number;
+
+  /**
+   * What to do about a payment error: `add_payment_method`,
+   * `update_payment_method` or `complete_payment`
+   */
+  nextStep?: string;
+
+  /**
+   * The amount a payment error is about, in cents
+   */
+  amountCents?: number;
+
+  /**
+   * A secure payment page to finish a payment the bank wants confirmed
+   * (payment_requires_authentication)
+   */
+  checkoutUrl?: string;
 
   /**
    * Additional error context
@@ -2485,7 +2521,11 @@ export type WebhookEventType =
   | "short_code.action_required"
   | "short_code.rejected"
   | "short_code.filed"
-  | "short_code.live";
+  | "short_code.live"
+  | "short_code.suspended"
+  | "short_code.reactivated"
+  | "short_code.payment_succeeded"
+  | "short_code.payment_failed";
 
 /**
  * Source of a list-health event. Frozen enum — new values will be
@@ -4535,8 +4575,21 @@ export interface ShortCodeApplicationView {
     /** One-time setup fee, in US dollars */
     setupUsd?: number;
     currency: "USD";
+    /** Always false, kept for older clients; `billing` says what is charged */
     autoBilled: false;
+    /** One-time setup fee in cents, charged at submit */
+    setupCents?: number;
+    /** Monthly lease in cents, fixed when the application is submitted */
+    monthlyCents?: number;
+    /** The lease runs at least this many months from go-live */
+    minimumTermMonths?: number;
+    /** When the setup fee is charged */
+    setupChargedAt?: "submit";
+    /** When the first lease month is charged */
+    leaseStartsAt?: "go_live";
   };
+  /** Where the setup fee and the lease stand, and every charge */
+  billing?: ShortCodeBilling;
   /** Whether the workspace's business is verified, which the application needs */
   verification?: {
     verified: boolean;
@@ -4557,7 +4610,108 @@ export interface ShortCodeApplicationView {
   };
   submitted?: boolean;
   alreadySubmitted?: boolean;
+  /** On submit: the setup fee's status and whether this call charged it */
+  payment?: { status: "paid" | "waived"; charged: boolean };
   ignoredFields?: string[];
+}
+
+/** Where a short code's setup fee stands. */
+export type ShortCodeSetupFeeStatus =
+  | "unpaid"
+  | "processing"
+  | "requires_action"
+  | "failed"
+  | "no_payment_method"
+  | "paid"
+  | "waived"
+  | "refund_pending"
+  | "refunded";
+
+/** Where a short code's monthly lease stands. */
+export type ShortCodeLeaseState =
+  | "not_started"
+  | "running"
+  | "past_due"
+  | "paused"
+  | "ending"
+  | "ended";
+
+/** A lease month that has not been paid. */
+export interface ShortCodeLeasePastDue {
+  chargeId: string;
+  amountCents: number;
+  status: string;
+  periodStart: string | null;
+  periodEnd: string | null;
+  firstFailedAt: string | null;
+  /** When sending from the code pauses if the month is still unpaid */
+  pauseAt: string | null;
+  noticeStage: string | null;
+}
+
+/** The monthly lease of a short code. */
+export interface ShortCodeLease {
+  monthlyCents: number;
+  minimumTermMonths: number;
+  /** Present on the application; always `go_live` */
+  startsAt?: "go_live";
+  state: ShortCodeLeaseState;
+  /** False while Sendly is not billing leases yet */
+  billingEnabled: boolean;
+  startedAt: string | null;
+  nextChargeAt: string | null;
+  paidThrough: string | null;
+  termEndsAt: string | null;
+  /** Set once the lease is cancelled: the day it ends */
+  endsAt: string | null;
+  cancelRequestedAt: string | null;
+  pastDue: ShortCodeLeasePastDue | null;
+  /** Months that fell due and are charged in the next daily run */
+  dueMonths: number;
+  dueCents: number;
+}
+
+/** One short code charge: the setup fee or a lease month. */
+export interface ShortCodeCharge {
+  id: string;
+  kind: "setup" | "lease";
+  amountCents: number;
+  /** `paid`, `refunded`, `waived`, `not_charged`, or a payment still being taken */
+  status: string;
+  paidAt: string | null;
+  refundedCents: number;
+  refundedAt: string | null;
+  periodStart: string | null;
+  periodEnd: string | null;
+  createdAt: string | null;
+}
+
+/** Where the money stands on a short code application. */
+export interface ShortCodeBilling {
+  setupFee: {
+    amountCents: number;
+    status: ShortCodeSetupFeeStatus;
+    chargedAt: "submit";
+    paidAt: string | null;
+    refundedCents: number;
+    refundedAt: string | null;
+  };
+  lease: ShortCodeLease;
+  terms: {
+    version: string;
+    acceptedVersion: string | null;
+    acceptedAt: string | null;
+  };
+  refundPolicy: "full_refund_before_filing";
+  /** Set when the workspace isn't charged by card */
+  exempt: "mock" | "enterprise" | null;
+  charges: ShortCodeCharge[];
+}
+
+/** Where a listed short code's setup fee and lease stand. */
+export interface ShortCodeListBilling {
+  setupFee: { status: ShortCodeSetupFeeStatus; amountCents: number };
+  lease: ShortCodeLease;
 }
 
 /** What a dry run of the application says, without changing anything. */
@@ -4580,6 +4734,8 @@ export interface ShortCode {
   reviewStatus?: string;
   useCase: string;
   createdAt: string;
+  /** Where the code's setup fee and lease stand */
+  billing?: ShortCodeListBilling;
 }
 
 /** Fields a caller may set on the application. */
@@ -4614,3 +4770,13 @@ export type ShortCodeApplicationInput = Partial<
     | "sampleMessages"
   >
 >;
+
+/** The body of a submit: final answers, plus acceptance of the price. */
+export type ShortCodeSubmitInput = ShortCodeApplicationInput & {
+  /**
+   * Accepts the $999 setup fee, charged to the workspace's card when you
+   * submit, the monthly lease from go-live and the 3-month minimum. Submit
+   * is refused with `short_code_invalid_application` until this is `true`.
+   */
+  acceptTerms?: boolean;
+};

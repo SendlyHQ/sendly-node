@@ -16,6 +16,7 @@ import type {
   ShortCodeApplicationInput,
   ShortCodeApplicationView,
   ShortCodePreflight,
+  ShortCodeSubmitInput,
 } from "../types";
 
 class ShortCodeApplicationResource {
@@ -26,8 +27,8 @@ class ShortCodeApplicationResource {
   }
 
   /**
-   * Fetch the workspace's short code application, with the documents it needs
-   * and the quoted monthly lease.
+   * Fetch the workspace's short code application, with the documents it needs,
+   * the quote, and `billing`: where the setup fee and the monthly lease stand.
    *
    * Requires the `short_codes:read` scope.
    *
@@ -108,23 +109,29 @@ class ShortCodeApplicationResource {
   /**
    * Submit the application to Sendly for review.
    *
-   * Submitting twice is safe: the second call reports `alreadySubmitted`.
+   * Submitting charges the one-time $999 setup fee to the workspace's card on
+   * file, so pass `acceptTerms: true` to accept it, the monthly lease from
+   * go-live and the 3-month minimum. The fee is refunded in full if Sendly
+   * rejects the application before filing it. Submitting twice is safe: the
+   * second call reports `alreadySubmitted` and charges nothing.
    *
    * Requires the `short_codes:write` scope.
    *
-   * @param application - Optional final answers, saved before the check
-   * @returns The submitted application
+   * @param application - `acceptTerms`, plus optional final answers saved before the check
+   * @returns The submitted application, with `payment` saying whether this call charged the fee
    *
    * @example
    * ```typescript
-   * const result = await sendly.shortCodes.application.submit();
+   * const result = await sendly.shortCodes.application.submit({ acceptTerms: true });
    * console.log(result.application.reviewStatus); // 'awaiting_review'
+   * console.log(result.billing?.setupFee.status); // 'paid'
    * ```
    *
-   * @throws {SendlyError} `short_code_invalid_application` (422) with an `errors` array naming every field
+   * @throws {SendlyError} `short_code_invalid_application` (422) with an `errors` array naming every field, including `acceptTerms`
+   * @throws {SendlyError} `payment_method_required`, `payment_failed` or `payment_requires_authentication` (402) when the fee can't be charged; the application stays a draft, and `error.response.checkoutUrl` is the secure payment page for the last one
    */
   async submit(
-    application: ShortCodeApplicationInput = {},
+    application: ShortCodeSubmitInput = {},
   ): Promise<ShortCodeApplicationView> {
     return this.http.request<ShortCodeApplicationView>({
       method: "POST",
@@ -150,7 +157,7 @@ export class ShortCodesResource {
    *
    * Requires the `short_codes:read` scope.
    *
-   * @returns Every code, including ones still being certified
+   * @returns Every code, including ones still being certified, each with `billing`: where its setup fee and lease stand
    *
    * @example
    * ```typescript

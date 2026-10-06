@@ -1134,10 +1134,12 @@ is no `create` method — the first `update()` creates the application, and a
 workspace has at most one open application at a time.
 
 ```typescript
-// Where the application stands, what it still needs, and the quoted lease
+// Where the application stands, what it still needs, and the price
 const view = await sendly.shortCodes.application.get();
 console.log(view.application.reviewStatus);   // 'draft'
-console.log(view.quote.monthlyUsd, view.quote.setupUsd, view.quote.currency); // never auto-billed
+console.log(view.quote.setupCents, view.quote.monthlyCents, view.quote.minimumTermMonths); // 99900, 115000, 3
+console.log(view.billing?.setupFee.status);   // 'unpaid' until you submit
+console.log(view.billing?.lease.state);       // 'not_started' until the code goes live
 console.log(view.missingDocuments);           // carrier forms still outstanding
 console.log(view.verification?.state);        // the business verification it needs
 for (const c of view.carriers.byCarrier ?? []) console.log(c.label, c.status);
@@ -1164,15 +1166,28 @@ await sendly.shortCodes.application.update({
 const { ok, issues } = await sendly.shortCodes.application.check();
 for (const issue of issues) console.log(issue.path, issue.message);
 
-// Submit to Sendly for review. Submitting twice is safe.
-const submitted = await sendly.shortCodes.application.submit();
-console.log(submitted.application.reviewStatus); // 'awaiting_review'
-console.log(submitted.alreadySubmitted);         // true on a repeat call
+// Submit to Sendly for review. This charges the one-time $999 setup fee to the
+// workspace's card on file, so it needs acceptTerms: the fee now, the monthly
+// lease from go-live and the 3-month minimum. Submitting twice is safe and
+// charges once.
+try {
+  const submitted = await sendly.shortCodes.application.submit({ acceptTerms: true });
+  console.log(submitted.application.reviewStatus); // 'awaiting_review'
+  console.log(submitted.payment);                  // { status: 'paid', charged: true }
+} catch (err) {
+  if (err instanceof SendlyError && err.code === 'payment_requires_authentication') {
+    console.log('Confirm the payment at', err.response?.checkoutUrl);
+  } else throw err;
+}
 
 // The codes leased to the workspace
 const { shortCodes } = await sendly.shortCodes.list();
 const sendable = shortCodes.filter((code) => code.status === 'active');
 console.log(shortCodes.map((code) => `${code.shortCode ?? 'pending'}: ${code.status} (${code.reviewStatus})`));
+for (const code of shortCodes) {
+  const pastDue = code.billing?.lease.pastDue;
+  if (pastDue) console.log(code.shortCode, 'owes', pastDue.amountCents, 'sending pauses', pastDue.pauseAt);
+}
 ```
 
 Review states move `draft` → `awaiting_review` → `approved_for_filing` →
@@ -1184,8 +1199,19 @@ and `suspended` or `cancelled`.
 Refusals: `short_codes_not_enabled` (404) when short codes are not switched on
 for the account, `short_code_locked` (409) once the application is with Sendly
 or the carriers, and `short_code_invalid_application` (422) with an `errors`
-array naming every field. The `short_code.action_required`, `short_code.filed`,
-`short_code.rejected` and `short_code.live` webhooks track it without polling.
+array naming every field, including `acceptTerms`. Submit answers 402 when the
+setup fee can't be charged, and the application stays a draft:
+`payment_method_required` (no card on file), `payment_failed` (declined) or
+`payment_requires_authentication` (the bank wants it confirmed; open
+`error.response.checkoutUrl`). `short_code_payment_in_progress` (409) means
+another payment is still running.
+
+The lease is charged to the card monthly from the day the code goes live, with
+a 3-month minimum; `billing.lease` says where it stands. The
+`short_code.action_required`, `short_code.filed`, `short_code.rejected`,
+`short_code.live`, `short_code.suspended`, `short_code.reactivated`,
+`short_code.payment_succeeded` and `short_code.payment_failed` webhooks track it
+without polling.
 
 ## WhatsApp
 

@@ -240,6 +240,25 @@ export type {
   WebhookEventTypeDetail,
 } from "./types";
 
+// Types - Short codes
+export type {
+  ShortCode,
+  ShortCodeIssue,
+  ShortCodeDocument,
+  ShortCodeApplication,
+  ShortCodeApplicationView,
+  ShortCodeApplicationInput,
+  ShortCodeSubmitInput,
+  ShortCodePreflight,
+  ShortCodeBilling,
+  ShortCodeListBilling,
+  ShortCodeLease,
+  ShortCodeLeasePastDue,
+  ShortCodeLeaseState,
+  ShortCodeCharge,
+  ShortCodeSetupFeeStatus,
+} from "./types";
+
 // Types - Account & Credits
 export type {
   Account,
