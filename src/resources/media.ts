@@ -49,7 +49,8 @@ export class MediaResource {
    * console.log(media.url); // https://...
    * ```
    *
-   * @throws {ValidationError} If the file is invalid or too large
+   * @throws {ValidationError} If no file reached the API
+   * @throws {SendlyError} With code `unsupported_media_type` (HTTP 415) for a type other than JPEG, PNG or GIF, `file_too_large` (HTTP 413) for a file over 600 KB, or `invalid_file` (HTTP 400) when the content is not the image type it is labelled with
    * @throws {AuthenticationError} If the API key is invalid
    * @throws {RateLimitError} If rate limit is exceeded
    */

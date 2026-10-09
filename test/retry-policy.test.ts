@@ -294,6 +294,21 @@ describe("Retry policy", () => {
       expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 
+    it.each([
+      [413, "file_too_large", 'The file in field "file" is too large.'],
+      [415, "unsupported_media_type", "Only JPEG, PNG, and GIF images are allowed for MMS"],
+    ])("does not retry a %i upload refusal, and keeps its code and reason", async (status, code, message) => {
+      fetchMock.mockResolvedValue(mockFetchResponse({ error: code, message }, status));
+
+      const error = await settle(client.media.upload(file, { contentType: "image/webp" }));
+
+      expect(error).toBeInstanceOf(SendlyError);
+      expect((error as SendlyError).code).toBe(code);
+      expect((error as SendlyError).statusCode).toBe(status);
+      expect((error as SendlyError).message).toBe(message);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
     it("retries a busy key-check 429 after its Retry-After, with the same key", async () => {
       fetchMock
         .mockResolvedValueOnce(

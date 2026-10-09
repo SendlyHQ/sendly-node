@@ -951,6 +951,12 @@ Upload a file, then attach its URL to a message. On SMS/MMS, `mediaUrls` only
 accepts URLs returned by `media.upload()` (max 10 per message); any other URL is
 refused with `invalid_request`.
 
+Uploads take a JPEG, PNG or GIF of up to 600 KB. Any other type throws a
+`SendlyError` with code `unsupported_media_type` (HTTP 415) and the reason in
+its message, and a larger file throws `file_too_large` (HTTP 413). Neither is
+retried. A file whose content is not the image type it is labelled with throws
+`invalid_file` (HTTP 400).
+
 ```typescript
 import { readFileSync } from 'node:fs';
 
