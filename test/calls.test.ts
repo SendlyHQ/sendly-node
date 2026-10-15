@@ -456,6 +456,18 @@ describe("Calls Resource", () => {
       expect("transcript" in result).toBe(false);
     });
 
+    it.each(["transferred", "voicemail", "voicemail_unavailable"])(
+      "should carry the agent outcome hangupClass %s",
+      async (hangupClass) => {
+        const ended: Call = { ...mockCompletedCall, hangupClass };
+        fetchMock.mockResolvedValue(mockFetchResponse(ended));
+
+        const result = await client.calls.get(callId);
+
+        expect(result.hangupClass).toBe(hangupClass);
+      },
+    );
+
     it("should percent-encode the id", async () => {
       fetchMock.mockResolvedValue(mockFetchResponse(mockCompletedCall));
 

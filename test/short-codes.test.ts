@@ -219,6 +219,62 @@ describe("Short codes resource", () => {
     expect(result.payment).toEqual({ status: "paid", charged: true });
   });
 
+  it("application.get() carries the suggestions from the business details and Sendly's suggested wording", async () => {
+    fetchMock.mockResolvedValue(
+      mockFetchResponse({
+        ...view,
+        prefill: {
+          source: "verification",
+          legalName: "Acme Inc",
+          websiteUrl: "https://acme.example",
+          contact: { name: "Ada Lovelace", email: "ada@acme.example" },
+          usesHostedLegalPages: false,
+        },
+        generatedDefaults: { useCase: "Order and delivery alerts for Acme customers" },
+      }),
+    );
+
+    const result: ShortCodeApplicationView = await client.shortCodes.application.get();
+
+    expect(result.prefill.source).toBe("verification");
+    expect(result.prefill.contact?.email).toBe("ada@acme.example");
+    expect(result.generatedDefaults?.useCase).toBe("Order and delivery alerts for Acme customers");
+  });
+
+  it("submit() says whether Sendly's review team was told", async () => {
+    fetchMock.mockResolvedValue(
+      mockFetchResponse({
+        ...view,
+        submitted: true,
+        alreadySubmitted: true,
+        notified: false,
+        payment: { status: "paid", charged: false },
+      }),
+    );
+
+    const result = await client.shortCodes.application.submit({ acceptTerms: true });
+
+    expect(result.alreadySubmitted).toBe(true);
+    expect(result.notified).toBe(false);
+    expect(result.payment?.charged).toBe(false);
+  });
+
+  it("submit() throws verification_required while the business is not verified", async () => {
+    fetchMock.mockResolvedValue(
+      mockFetchResponse(
+        { error: "verification_required", message: "Verify your business before submitting." },
+        403,
+      ),
+    );
+
+    const error = await client.shortCodes.application
+      .submit({ acceptTerms: true })
+      .catch((e: SendlyError) => e);
+
+    expect((error as SendlyError).code).toBe("verification_required");
+    expect((error as SendlyError).statusCode).toBe(403);
+  });
+
   it("submit() throws the payment error with the secure payment page when the bank wants it confirmed", async () => {
     fetchMock.mockResolvedValue(
       mockFetchResponse(
@@ -245,6 +301,49 @@ describe("Short codes resource", () => {
     expect((error as SendlyError).response?.checkoutUrl).toBe("https://checkout.stripe.com/c/pay/cs_test_1");
     expect((error as SendlyError).response?.nextStep).toBe("complete_payment");
     expect((error as SendlyError).response?.amountCents).toBe(99900);
+  });
+
+  it("list() includes drafts that have no code yet", async () => {
+    fetchMock.mockResolvedValue(
+      mockFetchResponse({
+        shortCodes: [
+          {
+            id: "sc_2",
+            shortCode: null,
+            countryCode: "US",
+            status: "requested",
+            reviewStatus: "draft",
+            useCase: "Order and delivery alerts",
+            createdAt: "2026-10-01T10:00:00.000Z",
+            billing: {
+              setupFee: { status: "unpaid", amountCents: 99900 },
+              lease: {
+                monthlyCents: 115000,
+                minimumTermMonths: 3,
+                state: "not_started",
+                billingEnabled: true,
+                startedAt: null,
+                nextChargeAt: null,
+                paidThrough: null,
+                termEndsAt: null,
+                endsAt: null,
+                cancelRequestedAt: null,
+                pastDue: null,
+                dueMonths: 0,
+                dueCents: 0,
+              },
+            },
+          },
+        ],
+      }),
+    );
+
+    const { shortCodes } = await client.shortCodes.list();
+    const draft: ShortCode = shortCodes[0];
+
+    expect(draft.shortCode).toBeNull();
+    expect(draft.reviewStatus).toBe("draft");
+    expect(draft.billing.setupFee.status).toBe("unpaid");
   });
 
   it("list() carries each code's billing", async () => {

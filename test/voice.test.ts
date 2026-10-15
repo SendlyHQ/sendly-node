@@ -604,6 +604,24 @@ describe("Voice Resource", () => {
       expect(keyOfCall(fetchMock, 0)).toBeUndefined();
     });
 
+    it("should send transferTo and backgroundAudio in tools", async () => {
+      const updated = {
+        ...mockAgent,
+        tools: { ...mockAgent.tools, transferTo: "+15125550100", backgroundAudio: true },
+      };
+      fetchMock.mockResolvedValue(mockFetchResponse(updated));
+
+      const result = await client.voice.agents.update(agentId, {
+        tools: { transferTo: "+15125550100", backgroundAudio: true },
+      });
+
+      expect(bodyOfCall(fetchMock, 0)).toEqual({
+        tools: { transferTo: "+15125550100", backgroundAudio: true },
+      });
+      expect(result.tools.backgroundAudio).toBe(true);
+      expect(result.tools.transferTo).toBe("+15125550100");
+    });
+
     it("should send a caller-supplied idempotency key", async () => {
       fetchMock.mockResolvedValue(mockFetchResponse(mockAgent));
 

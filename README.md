@@ -1200,7 +1200,7 @@ try {
   } else throw err;
 }
 
-// The codes leased to the workspace
+// Every application and code, drafts included (shortCode is null until assigned)
 const { shortCodes } = await sendly.shortCodes.list();
 const sendable = shortCodes.filter((code) => code.status === 'active');
 console.log(shortCodes.map((code) => `${code.shortCode ?? 'pending'}: ${code.status} (${code.reviewStatus})`));
@@ -1230,7 +1230,8 @@ The lease is charged to the card monthly from the day the code goes live, with
 a 3-month minimum; `billing.lease` says where it stands. The
 `short_code.action_required`, `short_code.filed`, `short_code.rejected`,
 `short_code.live`, `short_code.suspended`, `short_code.reactivated`,
-`short_code.payment_succeeded` and `short_code.payment_failed` webhooks track it
+`short_code.cancelled`, `short_code.payment_succeeded` and
+`short_code.payment_failed` webhooks track it
 without polling.
 
 ## WhatsApp
@@ -1588,6 +1589,7 @@ if (message.channel === 'rcs') {
   console.log(message.rcs.agentName); // delivered over RCS
 } else {
   console.log(message.fellBackTo);            // 'sms'
+  console.log(message.rcs.fallbackReason);    // 'not_rcs_capable' or 'capability_check_failed'
   console.log(message.rcs.suggestionsDropped); // true - chips have no SMS form
 }
 
@@ -1613,7 +1615,20 @@ await sendly.messages.send({
   text: 'Your table is ready!',
   fallbackToSms: false,
 });
+
+// A promotion: RCS sends are transactional unless you say otherwise, and a
+// marketing message is held to the recipient's quiet hours, SMS fallback included
+await sendly.messages.send({
+  channel: 'rcs',
+  to: '+15125550123',
+  text: '20% off this weekend',
+  messageType: 'marketing',
+});
 ```
+
+A `409 rcs_send_unconfirmed` means the RCS network may have taken the
+message: it is marked failed and refunded but can still arrive, so check
+before sending it again. The SDK never retries it.
 
 ## Voice Calls
 
@@ -1742,9 +1757,12 @@ await sendly.voice.agents.delete(agent.id);
 Sent without `voiceEnabled`, `voiceMode: 'ring_dashboard'` or `'agent'`
 switches voice on, with the same refusals as `voiceEnabled: true`, and
 `'none'` switches it off; `voiceEnabled: false` always switches voice off. An
-unknown voice id falls back to the default voice. Agents can't transfer calls yet:
-with `tools.transferTo` set, a caller who asks for a person is told the
-message will be passed on and the agent takes their name and number.
+unknown voice id falls back to the default voice. With `tools.transferTo`
+set, a phone caller who asks for a person is offered a transfer and, once
+they confirm, connected to that number; the call ends with `hangupClass:
+'transferred'`. If the line is busy or nobody answers, the agent takes a
+message instead. `tools.backgroundAudio: true` plays quiet office ambience
+under the call.
 
 Refusals: `number_not_found` and `agent_not_found` (404); `invalid_request`
 (400, thrown as `ValidationError`), `invalid_voice_mode`, `agent_required` and

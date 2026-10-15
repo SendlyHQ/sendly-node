@@ -178,6 +178,8 @@ export interface RcsAgent {
   id: string;
   /** The agent name recipients see */
   name: string;
+  /** Same as `name` */
+  displayName?: string;
   /** Lifecycle status */
   status: RcsAgentStatus;
   /** Declared messaging use case, or null when not set */
@@ -189,6 +191,8 @@ export interface RcsAgent {
   sendable: boolean;
   /** Where the registration sits, in customer terms */
   stage?: RcsCustomerStage;
+  /** Same as `stage` */
+  customerStage?: RcsCustomerStage;
   /** ISO 8601 timestamp when the agent was registered */
   createdAt: string;
 }
@@ -665,6 +669,21 @@ export interface RcsRegistration {
   stage: RcsCustomerStage;
   /** False when something on file names a non-US country */
   usEligible: boolean;
+  /** Whether the business is verified; submitting for review needs `verified` */
+  verification?: RcsBusinessVerification;
+}
+
+/**
+ * Where the workspace's business verification stands, from its toll-free
+ * verification or its 10DLC brand. More `state` values may be added.
+ */
+export interface RcsBusinessVerification {
+  /** True once the business is verified */
+  verified: boolean;
+  /** `verified`, `in_review`, `needs_attention` or `not_started` */
+  state: "verified" | "in_review" | "needs_attention" | "not_started" | (string & {});
+  /** The dashboard page that shows it */
+  href: string;
 }
 
 /**
@@ -688,6 +707,8 @@ export interface RcsDossier {
   usEligible: boolean;
   /** Where the details came from */
   source: RcsDossierSource;
+  /** Whether the business is verified; submitting for review needs `verified` */
+  verification?: RcsBusinessVerification;
 }
 
 /**
@@ -1120,6 +1141,7 @@ class RcsAgentsResource {
    * console.log(stage); // "in_review"
    * ```
    *
+   * @throws {SendlyError} `verification_required` (403) until the workspace's business is verified; `verification` on {@link RcsRegistrationResource.get} says where it stands
    * @throws {SendlyError} `rcs_invalid_content` (422) with `response.errors` listing `brand.<field>` / `agent.<field>` gaps
    * @throws {SendlyError} `rcs_field_locked` (409) when already submitted
    * @throws {SendlyError} `rcs_brand_not_verified` (409) when the carrier network declined the brand

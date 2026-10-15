@@ -264,6 +264,16 @@ export interface WhatsAppMessage {
   message_format: "whatsapp";
 
   /**
+   * Always "whatsapp", the camelCase form of `message_format`
+   */
+  messageFormat?: "whatsapp";
+
+  /**
+   * Always "outbound"
+   */
+  direction?: "outbound";
+
+  /**
    * Destination phone number
    */
   to: string;
@@ -456,6 +466,15 @@ export interface SendRcsMessageRequest {
   fallbackToSms?: boolean;
 
   /**
+   * `transactional` (the default for RCS) or `marketing`. It applies to the
+   * RCS message and to an SMS fallback. During the recipient's quiet hours a
+   * marketing message is refused with 400 `compliance_blocked`, and a
+   * transactional one that reads as promotional with 400
+   * `TRANSACTIONAL_MARKETING_MISMATCH`. The stored message keeps the type.
+   */
+  messageType?: MessageType;
+
+  /**
    * Custom JSON metadata to attach to the message (max 4KB).
    */
   metadata?: Record<string, any>;
@@ -501,11 +520,27 @@ export interface RcsFallbackDetails {
   agentId: string;
 
   /**
+   * Why the message went as an SMS: `not_rcs_capable` when the recipient
+   * cannot receive RCS from the agent, `capability_check_failed` when the
+   * check itself failed. The stored message keeps it in
+   * `metadata.rcs.fallbackReason`.
+   */
+  fallbackReason?: RcsFallbackReason;
+
+  /**
    * Present (true) when the request carried suggestion chips — they have
    * no SMS form and were dropped
    */
   suggestionsDropped?: boolean;
 }
+
+/**
+ * Why an RCS request went out as an SMS. More values may be added.
+ */
+export type RcsFallbackReason =
+  | "not_rcs_capable"
+  | "capability_check_failed"
+  | (string & {});
 
 /**
  * An RCS message that was delivered over RCS.
@@ -525,6 +560,16 @@ export interface RcsSentMessage {
    * Always "rcs"
    */
   message_format: "rcs";
+
+  /**
+   * Always "rcs", the camelCase form of `message_format`
+   */
+  messageFormat?: "rcs";
+
+  /**
+   * Always "outbound"
+   */
+  direction?: "outbound";
 
   /**
    * Destination phone number
@@ -597,6 +642,16 @@ export interface RcsFallbackMessage {
    * Always "sms"
    */
   message_format: "sms";
+
+  /**
+   * Always "sms", the camelCase form of `message_format`
+   */
+  messageFormat?: "sms";
+
+  /**
+   * Always "outbound"
+   */
+  direction?: "outbound";
 
   /**
    * Destination phone number
@@ -892,6 +947,12 @@ export interface Message {
    * public type in a future release. Use `id` to track messages.
    */
   telnyxMessageId?: string | null;
+
+  /**
+   * True on a send from the workspace's own short code (a 5 or 6 digit
+   * `from`). Absent otherwise.
+   */
+  shortCode?: true;
 
   /**
    * Warning message (e.g., when "from" is ignored for domestic messages)
@@ -2066,6 +2127,7 @@ export type SendlyErrorCode =
   | "file_required"
   | "whatsapp_profile_photo_invalid"
   | "whatsapp_profile_photo_too_large"
+  | "whatsapp_profile_fetch_failed"
   | "whatsapp_profile_update_failed"
   | "whatsapp_conversational_components_fetch_failed"
   | "whatsapp_conversational_components_update_failed"
@@ -2087,6 +2149,25 @@ export type SendlyErrorCode =
   /** Too soon to send another WhatsApp code; `response.retryAfter` is the wait in seconds */
   | "whatsapp_verification_resend_too_soon"
   | "whatsapp_verification_resend_failed"
+  /** WhatsApp template refusals: the name, language, category, body, buttons or examples break a rule (HTTP 400), or the template's state forbids the change (HTTP 409) */
+  | "template_already_exists"
+  | "template_authentication_no_links"
+  | "template_authentication_otp_button_required"
+  | "template_body_required"
+  | "template_button_type_unsupported"
+  | "template_button_url_required"
+  | "template_category_invalid"
+  | "template_example_required"
+  | "template_header_variable_unsupported"
+  | "template_language_required"
+  | "template_name_invalid"
+  | "template_name_locked"
+  | "template_name_reserved_prefix"
+  | "template_not_editable"
+  | "template_not_found"
+  /** WhatsApp did not take the template or its change (HTTP 502) */
+  | "template_create_failed"
+  | "template_update_failed"
   | "signup_not_active"
   | "signup_not_found"
   | "rcs_not_enabled"
@@ -2103,6 +2184,12 @@ export type SendlyErrorCode =
   | "rcs_brand_not_verified"
   | "rcs_launch_not_ready"
   | "rcs_internal_error"
+  /** The carrier network refused the RCS request (HTTP 422); `message` carries its reason */
+  | "rcs_carrier_rejected"
+  /** The carrier network could not complete the RCS request (HTTP 502) */
+  | "rcs_carrier_unavailable"
+  /** The RCS network may have taken the message (HTTP 409): marked failed and refunded, but it can still arrive. Check before sending again */
+  | "rcs_send_unconfirmed"
   | "voice_not_enabled"
   | "outbound_calls_not_enabled"
   | "agent_required"
@@ -2165,6 +2252,19 @@ export type SendlyErrorCode =
   /** A refund of the setup fee is still going through (HTTP 409) */
   | "short_code_refund_pending"
   | "short_codes_not_enabled"
+  /** The workspace already has an open short code application (HTTP 409) */
+  | "short_code_application_exists"
+  /** Short code messages need a live API key (HTTP 403) */
+  | "short_code_requires_live_key"
+  /** The short code is not live yet (HTTP 403) */
+  | "short_code_not_ready"
+  /** The short code is suspended (HTTP 403) */
+  | "short_code_suspended"
+  /** The carrier did not take the short code message (HTTP 502); it is recorded as failed and refunded, and `response.id` is the message */
+  | "short_code_send_failed"
+  /** The short code carrier may have taken the message (HTTP 409): marked failed and refunded, but it can still arrive. Check before sending again */
+  | "short_code_send_unconfirmed"
+  | "short_code_internal_error"
   /** The workspace has no approved business verification (HTTP 403); `response.verificationUrl` links to it */
   | "business_verification_required"
   /** The workspace made 1,000 short links today (HTTP 429); `response.resetsAt` is the next midnight UTC */
@@ -2288,6 +2388,19 @@ export interface ApiErrorResponse {
    * `public_shortener`, `blocked_host` or `unsafe_destination`
    */
   reason?: string;
+
+  /**
+   * The carrier's error code on a send it refused or may have taken
+   * (rcs_send_unconfirmed, short_code_send_unconfirmed,
+   * short_code_send_failed)
+   */
+  errorCode?: string;
+
+  /**
+   * The id of the message recorded as failed (short_code_send_failed, and
+   * recipient_opted_out on a short code send)
+   */
+  id?: string;
 
   /**
    * Additional error context
@@ -2572,6 +2685,7 @@ export type WebhookEventType =
   | "short_code.live"
   | "short_code.suspended"
   | "short_code.reactivated"
+  | "short_code.cancelled"
   | "short_code.payment_succeeded"
   | "short_code.payment_failed";
 
@@ -4561,13 +4675,40 @@ export interface ShortCodeDocument {
   awaitingSignature: boolean;
 }
 
+/**
+ * Where a short code stands: `requested`, `provisioning`, `parked` (assigned
+ * but not cleared to send), `active` (sendable), `suspended` or `cancelled`.
+ * More values may be added.
+ */
+export type ShortCodeStatus =
+  | "requested"
+  | "provisioning"
+  | "parked"
+  | "active"
+  | "suspended"
+  | "cancelled"
+  | (string & {});
+
+/**
+ * Where Sendly's review of a short code application stands. More values may
+ * be added.
+ */
+export type ShortCodeReviewStatus =
+  | "draft"
+  | "awaiting_review"
+  | "changes_requested"
+  | "approved_for_filing"
+  | "filed"
+  | "rejected"
+  | (string & {});
+
 /** The short code application a workspace is filling in, or has filed. */
 export interface ShortCodeApplication {
   id: string | null;
   shortCode: string | null;
   countryCode: string;
-  status: string;
-  reviewStatus: string;
+  status: ShortCodeStatus;
+  reviewStatus: ShortCodeReviewStatus;
   reviewNote: string | null;
   orderType: "new" | "migration";
   codeType: "random" | "vanity";
@@ -4598,48 +4739,89 @@ export interface ShortCodeApplication {
   contentProviderRegistrationStatus: string;
   submittedAt: string | null;
   /** When Sendly finished reviewing the application */
-  reviewedAt?: string | null;
+  reviewedAt: string | null;
   filedAt: string | null;
   activatedAt: string | null;
   /** When the registry registration is next due to be re-vetted */
-  registryRevettingDueAt?: string | null;
+  registryRevettingDueAt: string | null;
   createdAt: string | null;
   updatedAt: string | null;
+}
+
+/**
+ * Suggestions from what the workspace has already told Sendly: its 10DLC
+ * brand or its toll-free verification. Never saved on the application
+ * unless sent back with a save. Fields with no value are left out.
+ */
+export interface ShortCodePrefill {
+  source: "tendlc" | "verification" | "none";
+  legalName?: string;
+  dba?: string;
+  ein?: string;
+  websiteUrl?: string;
+  address?: {
+    line1?: string;
+    line2?: string;
+    city?: string;
+    state?: string;
+    postalCode?: string;
+    countryCode?: string;
+  };
+  contact?: { name?: string; email?: string; phone?: string };
+  /** From the toll-free verification */
+  privacyPolicyUrl?: string;
+  /** From the toll-free verification */
+  termsUrl?: string;
+  /** Whether the toll-free verification uses Sendly's hosted legal pages */
+  usesHostedLegalPages?: boolean;
 }
 
 /** The application plus everything the caller needs to act on it. */
 export interface ShortCodeApplicationView {
   enabled: boolean;
   application: ShortCodeApplication;
+  /** Suggestions from the workspace's business details */
+  prefill: ShortCodePrefill;
   editable: boolean;
   lockMessage: string | null;
   canStartNewApplication: boolean;
+  /**
+   * Wording Sendly suggested for this application. Submit refuses it with
+   * `short_code_ai_draft_unedited` until a person has edited it. `null` when
+   * nothing was suggested.
+   */
+  generatedDefaults: { useCase?: string; optInFlow?: string } | null;
   requiredDocuments: string[];
   missingDocuments: string[];
   documents: ShortCodeDocument[];
   quote: {
     codeType: "random" | "vanity";
-    monthlyUsd: number | null;
+    /** Monthly lease, in US dollars */
+    monthlyUsd: number;
     /** One-time setup fee, in US dollars */
-    setupUsd?: number;
+    setupUsd: number;
     currency: "USD";
     /** Always false, kept for older clients; `billing` says what is charged */
     autoBilled: false;
     /** One-time setup fee in cents, charged at submit */
-    setupCents?: number;
+    setupCents: number;
     /** Monthly lease in cents, fixed when the application is submitted */
-    monthlyCents?: number;
+    monthlyCents: number;
     /** The lease runs at least this many months from go-live */
-    minimumTermMonths?: number;
+    minimumTermMonths: number;
     /** When the setup fee is charged */
-    setupChargedAt?: "submit";
+    setupChargedAt: "submit";
     /** When the first lease month is charged */
-    leaseStartsAt?: "go_live";
+    leaseStartsAt: "go_live";
   };
   /** Where the setup fee and the lease stand, and every charge */
-  billing?: ShortCodeBilling;
-  /** Whether the workspace's business is verified, which the application needs */
-  verification?: {
+  billing: ShortCodeBilling;
+  /**
+   * Whether the workspace's business is verified. Submit is refused with
+   * `verification_required` (403) until it is; `href` is the dashboard page
+   * that shows it.
+   */
+  verification: {
     verified: boolean;
     state: "verified" | "in_review" | "needs_attention" | "not_started";
     href: string;
@@ -4649,17 +4831,22 @@ export interface ShortCodeApplicationView {
     total: number;
     overall: "not_submitted" | "in_progress" | "approved" | "rejected";
     /** Where each carrier's certification stands */
-    byCarrier?: Array<{
+    byCarrier: Array<{
       carrier: string;
       label: string;
       status: "not_submitted" | "submitted" | "in_review" | "approved" | "rejected";
       updatedAt: string | null;
     }>;
   };
+  /** On submit: always true */
   submitted?: boolean;
+  /** On submit: true when it was already with Sendly, and nothing was charged */
   alreadySubmitted?: boolean;
+  /** On submit: whether Sendly's review team was told (false when it was already submitted, or the notice failed) */
+  notified?: boolean;
   /** On submit: the setup fee's status and whether this call charged it */
-  payment?: { status: "paid" | "waived"; charged: boolean };
+  payment?: { status: ShortCodeSetupFeeStatus; charged: boolean };
+  /** On a save or a check: fields Sendly or the carriers own, which were ignored */
   ignoredFields?: string[];
 }
 
@@ -4772,18 +4959,22 @@ export interface ShortCodePreflight {
   ignoredFields?: string[];
 }
 
-/** A short code leased to the workspace. */
+/**
+ * One of the workspace's short code applications, with its code once Sendly
+ * assigns one. `shortCode` is `null` until then, and drafts, rejected and
+ * cancelled applications are listed too.
+ */
 export interface ShortCode {
   id: string;
   shortCode: string | null;
   countryCode: string;
-  status: string;
+  status: ShortCodeStatus;
   /** Where Sendly's review of the application stands */
-  reviewStatus?: string;
+  reviewStatus: ShortCodeReviewStatus;
   useCase: string;
   createdAt: string;
   /** Where the code's setup fee and lease stand */
-  billing?: ShortCodeListBilling;
+  billing: ShortCodeListBilling;
 }
 
 /** Fields a caller may set on the application. */

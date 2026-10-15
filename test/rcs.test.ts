@@ -70,6 +70,21 @@ describe("RCS Resource", () => {
   };
 
   describe("agents.list()", () => {
+    it("should carry displayName and customerStage", async () => {
+      const agent: RcsAgent = {
+        ...mockAgent,
+        displayName: "Acme Coffee",
+        stage: "live",
+        customerStage: "live",
+      };
+      fetchMock.mockResolvedValue(mockFetchResponse({ agents: [agent] }));
+
+      const { agents } = await client.rcs.agents.list();
+
+      expect(agents[0].displayName).toBe("Acme Coffee");
+      expect(agents[0].customerStage).toBe("live");
+    });
+
     it("should list agents", async () => {
       const mockList: RcsAgentListResponse = { agents: [mockAgent] };
       fetchMock.mockResolvedValue(mockFetchResponse(mockList));
@@ -365,6 +380,92 @@ describe("RCS Resource", () => {
 
       const body = JSON.parse(fetchMock.mock.calls[0][1].body);
       expect(body.fallbackToSms).toBe(false);
+    });
+
+    it("should pass messageType through", async () => {
+      fetchMock.mockResolvedValue(mockFetchResponse(mockRcsMessage, 201));
+
+      await client.messages.send({
+        channel: "rcs",
+        to: "+15551234567",
+        text: "20% off this weekend",
+        messageType: "marketing",
+      });
+
+      const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+      expect(body.messageType).toBe("marketing");
+    });
+
+    it("should leave messageType out when it is not set", async () => {
+      fetchMock.mockResolvedValue(mockFetchResponse(mockRcsMessage, 201));
+
+      await client.messages.send({
+        channel: "rcs",
+        to: "+15551234567",
+        text: "Your table is ready!",
+      });
+
+      const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+      expect(body).not.toHaveProperty("messageType");
+    });
+
+    it("should expose why a message fell back to SMS", async () => {
+      fetchMock.mockResolvedValue(
+        mockFetchResponse(
+          {
+            ...mockFallbackMessage,
+            messageFormat: "sms",
+            direction: "outbound",
+            rcs: { ...mockFallbackMessage.rcs, fallbackReason: "not_rcs_capable" },
+          },
+          201,
+        ),
+      );
+
+      const message = await client.messages.send({
+        channel: "rcs",
+        to: "+15551234567",
+        text: "Your table is ready!",
+      });
+
+      expect(message.channel).toBe("sms");
+      if (message.channel === "sms") {
+        expect(message.rcs.fallbackReason).toBe("not_rcs_capable");
+        expect(message.messageFormat).toBe("sms");
+        expect(message.direction).toBe("outbound");
+      }
+    });
+
+    it("should surface rcs_send_unconfirmed on 409 without retrying", async () => {
+      const retryingClient = new Sendly({
+        apiKey: "sk_live_v1_valid_key",
+        maxRetries: 3,
+      });
+      fetchMock.mockResolvedValue(
+        mockFetchResponse(
+          {
+            error: "rcs_send_unconfirmed",
+            message:
+              "The RCS network may have accepted the message. It is marked failed and refunded, but can still arrive: check before sending again.",
+            errorCode: "10007",
+          },
+          409,
+        ),
+      );
+
+      try {
+        await retryingClient.messages.send({
+          channel: "rcs",
+          to: "+15551234567",
+          text: "Your table is ready!",
+        });
+        expect.fail("should have thrown");
+      } catch (error) {
+        expect((error as SendlyError).code).toBe("rcs_send_unconfirmed");
+        expect((error as SendlyError).statusCode).toBe(409);
+        expect((error as SendlyError).response?.errorCode).toBe("10007");
+      }
+      expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 
     it("should require exactly one of text or card", async () => {

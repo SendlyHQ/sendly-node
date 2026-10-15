@@ -190,6 +190,8 @@ export class MessagesResource {
    * @throws {InsufficientCreditsError} If credit balance is too low
    * @throws {AuthenticationError} If the API key is invalid
    * @throws {RateLimitError} If rate limit is exceeded
+   * @throws {SendlyError} `rcs_not_enabled` (404) while RCS is not enabled for the account
+   * @throws {SendlyError} `rcs_send_unconfirmed` (409) when the RCS network may have taken the message: it is marked failed and refunded but can still arrive, so check before sending again. Never retried.
    */
   async send(
     request: SendRcsMessageRequest,
@@ -214,10 +216,15 @@ export class MessagesResource {
    * console.log(message.segments);  // 1
    * ```
    *
+   * A 5 or 6 digit `from` sends from the workspace's own short code, and the
+   * message carries `shortCode: true`.
+   *
    * @throws {ValidationError} If the request is invalid
    * @throws {InsufficientCreditsError} If credit balance is too low
    * @throws {AuthenticationError} If the API key is invalid
    * @throws {RateLimitError} If rate limit is exceeded
+   * @throws {SendlyError} `short_code_send_unconfirmed` (409) when the short code carrier may have taken the message: it is marked failed and refunded but can still arrive, so check before sending again. Never retried.
+   * @throws {SendlyError} `short_code_send_failed` (502) when the carrier did not take a short code message: it is recorded as failed and refunded, and `error.response.id` is the failed message
    */
   async send(
     request: SendMessageRequest,
@@ -255,6 +262,7 @@ export class MessagesResource {
           ...(request.fallbackToSms !== undefined && {
             fallbackToSms: request.fallbackToSms,
           }),
+          ...(request.messageType && { messageType: request.messageType }),
           ...(request.metadata && { metadata: request.metadata }),
         },
       });

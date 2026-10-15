@@ -514,6 +514,14 @@ export interface WhatsAppTemplate {
   category: WhatsAppTemplateCategory;
   /** Review status */
   status: WhatsAppTemplateStatus;
+  /** Body text with `{{1}}`-style variables, or `null` when it has none */
+  body?: string | null;
+  /** Text header, or `null` */
+  header?: string | null;
+  /** Footer, or `null` */
+  footer?: string | null;
+  /** Example values for the body variables, by number: `{ "1": "A1234" }` */
+  examples?: Record<string, string>;
   /** Meta quality rating (e.g. "GREEN"), or null before first rating */
   qualityRating: string | null;
   /** Why Meta rejected the template, when status is `REJECTED` */

@@ -168,12 +168,19 @@ export interface VoiceAgentTools {
    */
   sendSms: boolean;
   /**
-   * A number in E.164 for callers who need a person, or `null`. Agents
-   * cannot transfer calls yet and never dial or read out this number: while
-   * it is set, a caller who asks for a person is told the message will be
-   * passed on, and the agent takes their name and number.
+   * An E.164 number the agent may transfer a phone caller to, or `null` to
+   * switch transfers off. A caller who asks for a person, or whom the agent
+   * cannot help, is offered a transfer; once they confirm, the agent
+   * connects them and the call ends with `hangupClass: "transferred"`. If
+   * the line is busy or unanswered after 30 seconds, the caller stays with
+   * the agent, which takes a message. On update, `""` or `null` removes it.
    */
   transferTo: string | null;
+  /**
+   * True when quiet office ambience plays under the call, with typing while
+   * the agent prepares a reply. Defaults to `false`.
+   */
+  backgroundAudio?: boolean;
 }
 
 /**
@@ -234,7 +241,7 @@ export interface CreateVoiceAgentRequest {
   greeting?: string;
   /** Business instructions the agent follows, up to 4000 characters */
   instructions?: string;
-  /** What the agent may do on a call. `sendSms` defaults to `true`, `transferTo` to `null`. */
+  /** What the agent may do on a call. `sendSms` defaults to `true`, `transferTo` to `null`, `backgroundAudio` to `false`. */
   tools?: Partial<VoiceAgentTools>;
 }
 

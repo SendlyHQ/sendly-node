@@ -7,8 +7,8 @@
  * not a purchase: you fill it in, Sendly reviews it, the carrier forms are
  * signed, Sendly files it, and each carrier certifies the code separately.
  *
- * The application lives at {@link ShortCodeApplicationResource}; leased codes
- * are listed with {@link ShortCodesResource.list}.
+ * The application lives at {@link ShortCodeApplicationResource}; every
+ * application and code is listed with {@link ShortCodesResource.list}.
  */
 import type { HttpClient } from "../utils/http";
 import type {
@@ -127,7 +127,9 @@ class ShortCodeApplicationResource {
    * console.log(result.billing?.setupFee.status); // 'paid'
    * ```
    *
+   * @throws {SendlyError} `verification_required` (403) until the workspace's business is verified; the answers sent are saved anyway, and `verification` on {@link ShortCodeApplicationResource.get} says where it stands
    * @throws {SendlyError} `short_code_invalid_application` (422) with an `errors` array naming every field, including `acceptTerms`
+   * @throws {SendlyError} `short_code_ai_draft_unedited` (422) when the only issues are wording Sendly suggested (`generatedDefaults`) that nobody edited
    * @throws {SendlyError} `payment_method_required`, `payment_failed` or `payment_requires_authentication` (402) when the fee can't be charged; the application stays a draft, and `error.response.checkoutUrl` is the secure payment page for the last one
    */
   async submit(
@@ -153,11 +155,14 @@ export class ShortCodesResource {
   }
 
   /**
-   * List the short codes leased to the workspace.
+   * List every short code application of the workspace, newest first, with
+   * its code once Sendly assigns one. Drafts (with `shortCode` `null`),
+   * rejected and cancelled applications are listed too, so filter on
+   * `status` for the codes you can send from.
    *
    * Requires the `short_codes:read` scope.
    *
-   * @returns Every code, including ones still being certified, each with `billing`: where its setup fee and lease stand
+   * @returns Every application and code, each with `billing`: where its setup fee and lease stand
    *
    * @example
    * ```typescript

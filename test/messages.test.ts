@@ -12,6 +12,7 @@ import {
   RateLimitError,
   NetworkError,
   TimeoutError,
+  SendlyError,
 } from "../src/errors";
 import { mockFetchResponse } from "./fixtures/responses";
 import type { Message, MessageListResponse } from "../src/types";
@@ -96,6 +97,54 @@ describe("Messages Resource", () => {
 
         const callBody = JSON.parse(fetchMock.mock.calls[0][1].body);
         expect(callBody.from).toBe("+15559876543");
+      });
+    });
+
+    describe("Short code sends", () => {
+      it("should send from a short code and carry shortCode: true", async () => {
+        fetchMock.mockResolvedValue(
+          mockFetchResponse(
+            { ...mockMessage, from: "55123", status: "sent", shortCode: true },
+            201,
+          ),
+        );
+
+        const result = await client.messages.send({
+          to: "+15551234567",
+          text: "Acme: your order shipped. Reply STOP to opt out.",
+          from: "55123",
+        });
+
+        const callBody = JSON.parse(fetchMock.mock.calls[0][1].body);
+        expect(callBody.from).toBe("55123");
+        expect(result.shortCode).toBe(true);
+      });
+
+      it("should surface short_code_send_unconfirmed on 409 without retrying", async () => {
+        const retryingClient = new Sendly({
+          apiKey: "sk_live_v1_valid_key",
+          maxRetries: 3,
+        });
+        fetchMock.mockResolvedValue(
+          mockFetchResponse(
+            {
+              error: "short_code_send_unconfirmed",
+              message:
+                "The short code carrier may have accepted the message. It is marked failed and refunded, but can still arrive: check before sending again.",
+              errorCode: "40300",
+            },
+            409,
+          ),
+        );
+
+        const error = await retryingClient.messages
+          .send({ to: "+15551234567", text: "Hello!", from: "55123" })
+          .catch((e: SendlyError) => e);
+
+        expect((error as SendlyError).code).toBe("short_code_send_unconfirmed");
+        expect((error as SendlyError).statusCode).toBe(409);
+        expect((error as SendlyError).response?.errorCode).toBe("40300");
+        expect(fetchMock).toHaveBeenCalledTimes(1);
       });
     });
 

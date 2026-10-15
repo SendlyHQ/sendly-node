@@ -41,13 +41,14 @@ export type CallStatus =
   | "cancelled"
   | "declined"
   | "failed"
-  | "suspended";
+  | "suspended"
+  | (string & {});
 
 /** Which way the call was placed. */
 export type CallDirection = "inbound" | "outbound";
 
 /** `pstn` is a phone call; `internal` is browser-to-browser between teammates. */
-export type CallKind = "pstn" | "internal";
+export type CallKind = "pstn" | "internal" | (string & {});
 
 /**
  * How the far end reached the call: `phone` (the phone network),
@@ -57,7 +58,7 @@ export type CallKind = "pstn" | "internal";
 export type CallChannel = "phone" | "whatsapp" | "browser" | (string & {});
 
 /** Who answered: an AI agent or the team in the dashboard. */
-export type CallHandledBy = "agent" | "dashboard";
+export type CallHandledBy = "agent" | "dashboard" | (string & {});
 
 /**
  * Billing state of a call:
@@ -68,7 +69,50 @@ export type CallHandledBy = "agent" | "dashboard";
 export type CallBilling = "metered" | "settled" | "unbilled";
 
 /** Recording state on a call, or `null` when nothing was recorded. */
-export type CallRecordingStatus = "recording" | "ready" | "failed" | null;
+export type CallRecordingStatus =
+  | "recording"
+  | "ready"
+  | "failed"
+  | (string & {})
+  | null;
+
+/**
+ * Why a call ended. A reason the API does not know is reported as `ended`,
+ * and more values may be added.
+ */
+export type CallHangupClass =
+  | "normal"
+  | "caller_hung_up"
+  | "callee_hung_up"
+  | "caller_left"
+  | "peer_left"
+  | "agent_ended"
+  | "agent_agent_hangup"
+  | "agent_caller_left"
+  | "ring_timeout"
+  | "callee_declined"
+  | "callee_busy"
+  | "caller_cancelled"
+  | "room_closed_unanswered"
+  | "agent_left_unanswered"
+  | "agent_caller_never_joined"
+  | "invalid_number"
+  | "destination_rejected"
+  | "max_duration"
+  | "credits_exhausted"
+  | "media_aborted"
+  | "peer_connection_lost"
+  | "room_closed"
+  | "agent_left"
+  | "transferred"
+  | "voicemail"
+  | "voicemail_unavailable"
+  | "setup_failed"
+  | "agent_dispatch_failed"
+  | "agent_api_unreachable"
+  | "agent_already_ended"
+  | "ended"
+  | (string & {});
 
 /**
  * One line of an agent call's transcript.
@@ -134,11 +178,15 @@ export interface Call {
    * `agent_caller_never_joined`, `invalid_number`, `destination_rejected`.
    * Cut short by the platform: `max_duration`, `credits_exhausted`,
    * `media_aborted`, `peer_connection_lost`, `room_closed`, `agent_left`.
+   * Agent outcomes: `transferred` (the agent connected the caller to its
+   * `tools.transferTo` number), `voicemail` (an outbound agent call reached
+   * voicemail and the agent left a message), `voicemail_unavailable` (an
+   * outbound agent call reached a mailbox that could not take a message).
    * Setup problems: `setup_failed`, `agent_dispatch_failed`,
    * `agent_api_unreachable`, `agent_already_ended`. Anything unrecognised
    * is reported as `ended`.
    */
-  hangupClass: string | null;
+  hangupClass: CallHangupClass | null;
   /** `recording`, `ready`, `failed`, or `null` when nothing was recorded */
   recordingStatus: CallRecordingStatus;
   /** The map you attached on create (`{}` when none) */
