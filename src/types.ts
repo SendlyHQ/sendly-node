@@ -1987,9 +1987,12 @@ export interface ShortLinkListItem {
   destinationUrl: string;
   /** Workspace brand slug segment, or `null` when unbranded. */
   brandSlug: string | null;
-  /** Total human clicks recorded (link-preview bots are excluded). */
+  /** Human clicks recorded, one per visitor per link per day (link-preview bots are excluded). */
   clickCount: number;
-  /** Whether the link is disabled (the redirect then returns 404). */
+  /**
+   * Whether the link is disabled, by the workspace or by Sendly. The redirect
+   * then answers 410 (within about two minutes of the change).
+   */
   disabled: boolean;
   /** ISO 3166-1 alpha-2 country of the most recent click, or `null`. */
   lastCountry: string | null;
@@ -2007,7 +2010,10 @@ export interface ShortLinkListItem {
 export interface ShortLinkListResponse {
   /** The workspace's short links, newest first. */
   links: ShortLinkListItem[];
-  /** Total number of short links in the workspace. */
+  /**
+   * Total number of short links in the workspace, across every page. Keep
+   * adding `limit` to `offset` until `offset` reaches `total`.
+   */
   total: number;
 }
 
@@ -2159,6 +2165,27 @@ export type SendlyErrorCode =
   /** A refund of the setup fee is still going through (HTTP 409) */
   | "short_code_refund_pending"
   | "short_codes_not_enabled"
+  /** The workspace has no approved business verification (HTTP 403); `response.verificationUrl` links to it */
+  | "business_verification_required"
+  /** The workspace made 1,000 short links today (HTTP 429); `response.resetsAt` is the next midnight UTC */
+  | "daily_link_limit_reached"
+  /** The destination is a public shortener, a blocked site or flagged unsafe (HTTP 400); see `response.reason` */
+  | "link_destination_not_allowed"
+  /** The destination is over 2,048 characters (HTTP 400) */
+  | "destination_too_long"
+  /** The URL is not an http or https URL (HTTP 400) */
+  | "invalid_url"
+  /** The URL is already a Sendly short link (HTTP 400) */
+  | "already_short"
+  /** Sendly took the link down, so the workspace cannot re-enable it (HTTP 409) */
+  | "link_disabled_by_sendly"
+  /** No link with that code in the workspace (HTTP 404) */
+  | "link_not_found"
+  /** Short links are switched off for a moment (HTTP 503) */
+  | "short_links_disabled"
+  /** The API key has no workspace (HTTP 400) */
+  | "workspace_required"
+  | "disabled_boolean_required"
   | "internal_error"
   /** The response did not come from the Sendly API (wrong baseUrl, or a proxy intercepted it) */
   | "invalid_response"
@@ -2240,6 +2267,27 @@ export interface ApiErrorResponse {
    * (payment_requires_authentication)
    */
   checkoutUrl?: string;
+
+  /**
+   * Where to finish business verification (business_verification_required)
+   */
+  verificationUrl?: string;
+
+  /**
+   * When a daily limit resets, ISO 8601 (daily_link_limit_reached)
+   */
+  resetsAt?: string;
+
+  /**
+   * The daily limit that was reached (daily_link_limit_reached)
+   */
+  limit?: number;
+
+  /**
+   * Why a destination was refused (link_destination_not_allowed):
+   * `public_shortener`, `blocked_host` or `unsafe_destination`
+   */
+  reason?: string;
 
   /**
    * Additional error context

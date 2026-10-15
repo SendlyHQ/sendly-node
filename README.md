@@ -1075,6 +1075,20 @@ await sendly.links.disable(link.code);
 await sendly.links.enable(link.code);
 ```
 
+Listing needs the `links:read` scope; creating and disabling need
+`links:write` (a key made before those scopes, holding neither, can use
+`sms:read` and `sms:send`). Creating needs a live key of a workspace with an
+approved business verification. A disabled link's redirect answers 410 within
+about two minutes. `list` returns the workspace's `total` for paging with
+`limit` (1-200) and `offset`.
+
+Refusals keep the API's code on `err.code`: `business_verification_required`
+(`err.response.verificationUrl`), `daily_link_limit_reached` (429, 1,000 links
+per workspace per UTC day, `err.response.resetsAt`), `link_destination_not_allowed`
+(`err.response.reason`), `destination_too_long`, `invalid_url`, `already_short`,
+`live_key_required`, `short_links_disabled` (503), `link_not_found` and
+`link_disabled_by_sendly` (409).
+
 ## 10DLC (Local Number Texting)
 
 Register your business for carrier review so you can text from local (10-digit) US numbers. The flow is brand → campaign → assign number. Writes require a live API key.

@@ -9,8 +9,13 @@
  *
  * Branded, owned-domain short links improve deliverability — carriers filter
  * public shorteners — and give you click data for analytics. Shortening is
- * gated behind the `url_shortener` rollout flag; calls return `not_enabled`
- * until the flag is on for your account.
+ * gated behind the `url_shortener` rollout flag; calls fail with `not_found`
+ * (404) until the flag is on for your account.
+ *
+ * Listing needs the `links:read` scope and creating or disabling needs
+ * `links:write`. A key made before those scopes existed, holding neither, can
+ * use `sms:read` and `sms:send` instead. Only a live key of a workspace with an
+ * approved business verification can create links.
  *
  * @see https://sendly.live/docs/links
  */
@@ -65,8 +70,13 @@ export class LinksResource {
    * console.log(link.shortUrl); // "https://sendly.live/l/Ab3xY7"
    * ```
    *
-   * @throws {ValidationError} If `url` is missing or not an http/https URL
-   * @throws {AuthenticationError} If the API key is invalid
+   * @throws {SendlyError} `invalid_url`, `already_short`, `destination_too_long`
+   *   or `link_destination_not_allowed` (with `response.reason`) for a refused URL
+   * @throws {SendlyError} `live_key_required` for a test key or CLI login, and
+   *   `business_verification_required` (with `response.verificationUrl`)
+   * @throws {SendlyError} `daily_link_limit_reached` (429, with
+   *   `response.resetsAt`) after 1,000 links in a UTC day; it is not retried
+   * @throws {AuthenticationError} If the API key is invalid or lacks the scope
    */
   async create(request: CreateShortLinkRequest): Promise<ShortLink> {
     if (!request || typeof request.url !== "string" || !request.url.trim()) {
@@ -84,14 +94,20 @@ export class LinksResource {
    * List the short links your workspace has created, newest first, with click
    * counts and a 14-day daily click histogram.
    *
-   * @param options - Pagination options (`limit` 1-200, `offset`)
-   * @returns The links and a total count
+   * @param options - Pagination options (`limit` 1-200, default 50; `offset`)
+   * @returns The links and the workspace's total count, for paging
    *
    * @example
    * ```typescript
    * const { links, total } = await sendly.links.list({ limit: 50 });
    * for (const link of links) {
    *   console.log(`${link.shortUrl} -> ${link.destinationUrl} (${link.clickCount} clicks)`);
+   * }
+   *
+   * // Every page
+   * for (let offset = 0; ; offset += 200) {
+   *   const page = await sendly.links.list({ limit: 200, offset });
+   *   if (page.links.length === 0 || offset + page.links.length >= page.total) break;
    * }
    * ```
    *
@@ -111,8 +127,9 @@ export class LinksResource {
   }
 
   /**
-   * Enable or disable a short link. A disabled link's redirect returns 404
-   * until it is re-enabled.
+   * Enable or disable a short link. A disabled link's redirect answers 410,
+   * within about two minutes, until it is re-enabled. In a team workspace
+   * only an owner or admin can do this.
    *
    * @param code - The short link code
    * @param disabled - `true` to disable, `false` to re-enable
@@ -124,8 +141,9 @@ export class LinksResource {
    * await sendly.links.setDisabled("Ab3xY7", false); // re-enable
    * ```
    *
-   * @throws {NotFoundError} If no such link exists in your workspace
-   * @throws {AuthenticationError} If the API key is invalid
+   * @throws {SendlyError} `link_not_found` (404) if no such link exists in your workspace
+   * @throws {SendlyError} `link_disabled_by_sendly` (409) when re-enabling a link Sendly took down
+   * @throws {AuthenticationError} If the API key is invalid or lacks the scope or role
    */
   async setDisabled(
     code: string,
@@ -143,7 +161,7 @@ export class LinksResource {
   }
 
   /**
-   * Disable a short link (its redirect returns 404 until re-enabled).
+   * Disable a short link (its redirect answers 410 until re-enabled).
    * Convenience wrapper over {@link LinksResource.setDisabled}.
    *
    * @param code - The short link code
