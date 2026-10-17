@@ -121,7 +121,7 @@ export class MessagesResource {
    *   }
    * });
    *
-   * console.log(message.whatsapp.kind);  // 'template'
+   * console.log(message.whatsapp?.kind);  // 'template'
    * console.log(message.creditsUsed);    // priced by country + category
    * ```
    *

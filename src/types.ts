@@ -338,9 +338,9 @@ export interface WhatsAppMessage {
   /**
    * Body text for free-form text sends, or the caption for media sends
    * (pass it as `text` with `mediaUrls`); null for template sends and for
-   * media sent without a caption
+   * media sent without a caption. Absent in the same case as `whatsapp`.
    */
-  text: string | null;
+  text?: string | null;
 
   /**
    * Current delivery status
@@ -360,19 +360,22 @@ export interface WhatsAppMessage {
    * of 12 credits. Templates are priced by category and destination
    * country; countries without a listed price use 33 (marketing), 12
    * (utility) and 12 (authentication) credits. A failed send gives its
-   * slot back.
+   * slot back. Absent in the same case as `whatsapp`.
    */
-  creditsUsed: number;
+  creditsUsed?: number;
 
   /**
-   * WhatsApp-specific details
+   * WhatsApp-specific details. Absent when WhatsApp accepted the message but
+   * recording it failed: the message is in flight and was charged, so don't
+   * send it again.
    */
-  whatsapp: WhatsAppMessageDetails;
+  whatsapp?: WhatsAppMessageDetails;
 
   /**
-   * ISO 8601 timestamp when the message was created
+   * ISO 8601 timestamp when the message was created. Absent in the same case
+   * as `whatsapp`.
    */
-  createdAt: string;
+  createdAt?: string;
 
   /**
    * Custom JSON metadata attached to the message
@@ -1051,6 +1054,17 @@ export interface Message {
     classifiedAt: string;
     model: string;
   } | null;
+
+  /**
+   * On a WhatsApp message sent with `fallbackToSms`: what happened to its
+   * SMS fallback.
+   */
+  fallback?: WhatsAppSmsFallback;
+
+  /**
+   * On an SMS fallback: the id of the WhatsApp message it replaced.
+   */
+  fallbackOf?: string;
 }
 
 /**

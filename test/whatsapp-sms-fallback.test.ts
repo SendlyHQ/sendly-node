@@ -69,3 +69,71 @@ describe("WhatsApp sends with fallbackToSms", () => {
     expect(bodyOf(fetchMock).fallbackToSms).toBe(false);
   });
 });
+
+describe("WhatsApp responses the types must allow", () => {
+  let client: Sendly;
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    client = new Sendly({ apiKey: "sk_live_v1_test", maxRetries: 0 });
+    fetchMock = vi.fn();
+    global.fetch = fetchMock;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("returns a send WhatsApp accepted but couldn't fully record, without sending again", async () => {
+    fetchMock.mockResolvedValueOnce(
+      mockFetchResponse(
+        {
+          id: "msg_wa_rec",
+          channel: "whatsapp",
+          message_format: "whatsapp",
+          messageFormat: "whatsapp",
+          to: TO,
+          from: FROM,
+          status: "sent",
+          direction: "outbound",
+          segments: 1,
+          metadata: {},
+        },
+        201,
+      ),
+    );
+    const message = (await client.messages.send({
+      channel: "whatsapp",
+      from: FROM,
+      to: TO,
+      text: "Hi",
+    })) as WhatsAppMessage;
+    expect(message.id).toBe("msg_wa_rec");
+    expect(message.whatsapp?.kind).toBeUndefined();
+    expect(message.createdAt).toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("types the fallback and fallbackOf of a message read back", async () => {
+    fetchMock.mockResolvedValueOnce(
+      mockFetchResponse({
+        id: "msg_sms",
+        to: TO,
+        from: FROM,
+        text: "Your table is ready.",
+        status: "delivered",
+        direction: "outbound",
+        segments: 1,
+        creditsUsed: 2,
+        isSandbox: false,
+        createdAt: "2026-10-17T10:00:00.000Z",
+        messageFormat: "sms",
+        fallbackOf: "msg_wa",
+      }),
+    );
+    const message = await client.messages.get("msg_sms");
+    const fallback: WhatsAppSmsFallback | undefined = message.fallback;
+    expect(message.fallbackOf).toBe("msg_wa");
+    expect(fallback).toBeUndefined();
+  });
+});
