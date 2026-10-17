@@ -202,6 +202,58 @@ export interface SendWhatsAppMessageRequest {
    * Custom JSON metadata to attach to the message (max 4KB).
    */
   metadata?: Record<string, any>;
+
+  /**
+   * Defaults to `false`. When `true`, a message WhatsApp can't deliver goes
+   * as an SMS from the same number, billed as one: when the 24-hour window is
+   * closed, when WhatsApp refuses it, or when WhatsApp reports it
+   * undeliverable later. The number must be able to send SMS to the
+   * recipient (US and Canada only), or the API responds 403
+   * `sms_fallback_unavailable`. Marketing and authentication templates, and
+   * media without a caption, can't fall back (422
+   * `sms_fallback_not_supported`). See `WhatsAppMessage.fallback`.
+   */
+  fallbackToSms?: boolean;
+}
+
+/**
+ * The SMS fallback of a WhatsApp message sent with `fallbackToSms: true`
+ */
+export interface WhatsAppSmsFallback {
+  channel: "sms";
+
+  /**
+   * `pending` until WhatsApp's outcome is known; `sent` when the SMS went;
+   * `failed` when the SMS was refused or credits ran out; `unavailable` when
+   * the SMS could no longer be sent from this number; `skipped` when the
+   * WhatsApp failure isn't one an SMS fixes
+   */
+  status: "pending" | "sent" | "failed" | "unavailable" | "skipped" | (string & {});
+
+  /**
+   * What made the message fall back
+   */
+  reason?: "window_closed" | "whatsapp_refused" | "whatsapp_failed" | (string & {});
+
+  /**
+   * The SMS message's id, once it exists
+   */
+  messageId?: string;
+
+  /**
+   * Credits charged for the SMS
+   */
+  creditsUsed?: number;
+
+  /**
+   * Why the SMS didn't go, in plain English
+   */
+  error?: string;
+
+  /**
+   * Template parts with no SMS form, such as `quick_replies`
+   */
+  contentDropped?: string[];
 }
 
 /**
@@ -326,6 +378,13 @@ export interface WhatsAppMessage {
    * Custom JSON metadata attached to the message
    */
   metadata?: Record<string, any>;
+
+  /**
+   * Present when the send asked for `fallbackToSms`. When WhatsApp couldn't
+   * take the message and it went as an SMS, `status` is `failed` and
+   * `fallback.status` is `sent`.
+   */
+  fallback?: WhatsAppSmsFallback;
 }
 
 /**

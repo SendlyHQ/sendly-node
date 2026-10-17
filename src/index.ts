@@ -73,6 +73,7 @@ export type {
   WhatsAppMessageKind,
   WhatsAppMessageCategory,
   WhatsAppMessageDetails,
+  WhatsAppSmsFallback,
   WhatsAppMessage,
 } from "./types";
 

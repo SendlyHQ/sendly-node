@@ -290,6 +290,9 @@ export class MessagesResource {
           ...(hasMedia && { mediaUrls: request.mediaUrls }),
           ...(request.template && { template: request.template }),
           ...(request.metadata && { metadata: request.metadata }),
+          ...(request.fallbackToSms !== undefined && {
+            fallbackToSms: request.fallbackToSms,
+          }),
         },
       });
 
