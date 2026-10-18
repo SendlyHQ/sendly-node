@@ -1,5 +1,14 @@
 # @sendly/node
 
+## 4.5.0
+
+### Minor Changes
+
+- [#291](https://github.com/SendlyHQ/sendly/pull/291) [`6d26b52`](https://github.com/SendlyHQ/sendly/commit/6d26b52688a453b3d67a2e4fcdf0e6710fe4beb6) Thanks [@sendly-live](https://github.com/sendly-live)! - WhatsApp to SMS fallback in every SDK: Java, .NET, Go, Rust and PHP now send `fallbackToSms` on WhatsApp sends and expose the `fallback` result and `fallbackOf`, matching Node, Python and Ruby. The Node README gains a fallback example.
+  - Node: `ApiErrorResponse.fallback` is typed as `WhatsAppSmsFallback`, so `error.response?.fallback` on a 422 `whatsapp_window_closed` or a refused `whatsapp_send_failed` needs no cast. There is no `fellBack()` helper: responses are plain objects, so check `message.fallback?.status === "sent"`.
+  - Node: docs give 503, the status the API sends, instead of 502 for the WhatsApp and voice errors raised when WhatsApp or the carrier couldn't be reached (`whatsapp_send_failed` when the message never reached WhatsApp, the WhatsApp signup, profile, template, conversational-components and calling errors, `voice_attach_failed` and `carrier_refused`). The API answers every 502 as a 503 with a `Sendly-Upstream-Status: 502` header. Nothing changes at runtime.
+  - MCP: `get_message` says a WhatsApp message sent with `fallbackToSms` carries `fallback` and the SMS sent in its place carries `fallbackOf`. `register_emergency_address` gives `carrier_refused` as 503, not 502.
+
 ## 4.4.0
 
 ### Minor Changes
