@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { Sendly } from "../src/client";
 import { mockFetchResponse } from "./fixtures/responses";
+import { SendlyError } from "../src";
 import type { WhatsAppMessage, WhatsAppSmsFallback } from "../src";
 
 const FROM = "+18885550190";
@@ -135,5 +136,26 @@ describe("WhatsApp responses the types must allow", () => {
     const fallback: WhatsAppSmsFallback | undefined = message.fallback;
     expect(message.fallbackOf).toBe("msg_wa");
     expect(fallback).toBeUndefined();
+  });
+
+  it("types the fallback on a refused send's error body, with no cast", async () => {
+    fetchMock.mockResolvedValueOnce(
+      mockFetchResponse(
+        {
+          error: "whatsapp_window_closed",
+          message: "The 24-hour window is closed.",
+          id: "msg_wa",
+          fallback: { channel: "sms", status: "unavailable", reason: "window_closed", error: "Quiet hours" },
+        },
+        422,
+      ),
+    );
+    const error = await client.messages
+      .send({ channel: "whatsapp", to: TO, from: FROM, text: "Hi", fallbackToSms: true })
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(SendlyError);
+    const fallback: WhatsAppSmsFallback | undefined = (error as SendlyError).response?.fallback;
+    expect(fallback?.status).toBe("unavailable");
+    expect(fallback?.error).toBe("Quiet hours");
   });
 });

@@ -347,7 +347,7 @@ export class Sendly {
    * WhatsApp API resource — connect senders, manage templates, check
    * 24-hour windows.
    *
-   * Connecting a number is a one-time $19 setup (no monthly fee) and ends
+   * Connecting a number is free (no setup or monthly fee) and ends
    * with a human step: hand the returned `connectUrl` to your user — they
    * open it in a browser and log in with Facebook to link their WhatsApp
    * Business Account.

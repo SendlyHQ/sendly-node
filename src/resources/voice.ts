@@ -420,7 +420,7 @@ class VoiceNumbersResource {
    * @throws {SendlyError} `invalid_voice_mode` (400) / `agent_required` (400) when `agent` mode has no agent
    * @throws {SendlyError} `number_not_found` (404) / `agent_not_found` (404)
    * @throws {SendlyError} `agent_disabled` (409) when the agent is switched off
-   * @throws {SendlyError} `voice_attach_failed` (502) when voice couldn't be switched on; try again
+   * @throws {SendlyError} `voice_attach_failed` (503) when voice couldn't be switched on; try again
    * @throws {SendlyError} `voice_unavailable` (503) when voice can't be switched on for numbers yet
    */
   async update(
@@ -475,7 +475,7 @@ class VoiceNumbersResource {
    * @throws {SendlyError} `invalid_address` (400) for a malformed field, or (422) when the address couldn't be validated; `error.response.suggested` holds a corrected address when one was found
    * @throws {SendlyError} `e911_not_applicable` (400) for a number outside the US and Canada
    * @throws {SendlyError} `number_not_found` (404)
-   * @throws {SendlyError} `carrier_refused` (502) when the registration was refused; try again, unless the message says the number couldn't be found for emergency registration (contact support)
+   * @throws {SendlyError} `carrier_refused` (503) when the registration was refused; try again, unless the message says the number couldn't be found for emergency registration (contact support)
    */
   async registerEmergencyAddress(
     number: string,

@@ -2193,7 +2193,7 @@ export type SendlyErrorCode =
   | "whatsapp_template_not_found"
   | "whatsapp_template_not_approved"
   | "whatsapp_invalid_content"
-  /** WhatsApp refused the message (422, final) or provably never received it (502, safe to send again) */
+  /** WhatsApp refused the message (422, final) or provably never received it (503, safe to send again) */
   | "whatsapp_send_failed"
   /** The outcome of a WhatsApp send is unknown (409): marked failed and refunded, but it may still be delivered */
   | "whatsapp_send_unconfirmed"
@@ -2238,7 +2238,7 @@ export type SendlyErrorCode =
   | "template_name_reserved_prefix"
   | "template_not_editable"
   | "template_not_found"
-  /** WhatsApp did not take the template or its change (HTTP 502) */
+  /** WhatsApp did not take the template or its change (HTTP 503) */
   | "template_create_failed"
   | "template_update_failed"
   | "signup_not_active"
@@ -2470,10 +2470,17 @@ export interface ApiErrorResponse {
   errorCode?: string;
 
   /**
-   * The id of the message recorded as failed (short_code_send_failed, and
-   * recipient_opted_out on a short code send)
+   * The id of the message recorded as failed (short_code_send_failed,
+   * recipient_opted_out on a short code send, and whatsapp_window_closed)
    */
   id?: string;
+
+  /**
+   * What happened to the SMS fallback of a WhatsApp send that asked for
+   * `fallbackToSms` and failed (whatsapp_window_closed, and a refused
+   * whatsapp_send_failed)
+   */
+  fallback?: WhatsAppSmsFallback;
 
   /**
    * Additional error context

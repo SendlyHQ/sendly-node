@@ -129,7 +129,7 @@ export class MessagesResource {
    * @throws {InsufficientCreditsError} If credit balance is too low
    * @throws {AuthenticationError} If the API key is invalid
    * @throws {RateLimitError} If rate limit is exceeded
-   * @throws {SendlyError} `whatsapp_send_failed`: 422 when WhatsApp refused the message, which is final and not retried (the response is cached under the idempotency key and replayed for 24 hours); 502 when the message provably never reached the carrier, so it was not sent and is safe to send again. A 502 is never cached, so the SDK retries it like any 5xx under the same idempotency key. Either way the message wasn't charged. No send returns 503 `whatsapp_unavailable`.
+   * @throws {SendlyError} `whatsapp_send_failed`: 422 when WhatsApp refused the message, which is final and not retried (the response is cached under the idempotency key and replayed for 24 hours); 503 when the message provably never reached the carrier, so it was not sent and is safe to send again. A 503 is never cached, so the SDK retries it like any 5xx under the same idempotency key. Either way the message wasn't charged. No send returns 503 `whatsapp_unavailable`.
    * @throws {SendlyError} `whatsapp_send_unconfirmed` (409) when the outcome is unknown: the message was marked failed and refunded, but it may still be delivered, so check before sending it again (it could arrive twice). It is cached under the idempotency key and not retried automatically.
    * @throws {SendlyError} `whatsapp_not_enabled` (403) when WhatsApp isn't enabled for the key's owner, or `whatsapp_requires_live_key` (403) with a test key
    */
