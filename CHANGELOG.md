@@ -1,5 +1,13 @@
 # @sendly/node
 
+## 4.5.1
+
+### Patch Changes
+
+- [#295](https://github.com/SendlyHQ/sendly/pull/295) [`9f72bf8`](https://github.com/SendlyHQ/sendly/commit/9f72bf8525b0aa81cd260fa82e75194402013c9a) Thanks [@sendly-live](https://github.com/sendly-live)! - WhatsApp connection fee: the docs describe the one-time $9.99 fee per number again. It is charged to your card when a connection starts, refunded automatically if the connection fails, and not refundable once the number is connected.
+  - Node: the WhatsApp signup docs (starting a connection, adding a number by code, the signup status and its failure reasons, and the verification errors) mention the $9.99 fee and its refund again. Nothing changes at runtime.
+  - MCP: `start_whatsapp_signup`, `get_whatsapp_signup_status` and `verify_whatsapp_signup_code` describe the $9.99 fee, `payment_method_required` (402) and `setup_fee_payment_failed` again.
+
 ## 4.5.0
 
 ### Minor Changes
