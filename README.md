@@ -334,7 +334,7 @@ automatically too (up to `maxRetries`, with exponential backoff and jitter).
 Three WhatsApp calls throw a `5xx`, a timeout or a network error at once
 instead: `whatsapp.signup.create` with a `businessAccountId`,
 `whatsapp.signup.verify` and `whatsapp.senders.uploadProfilePhoto`, because
-repeating them can start a new signup or use up a verification
+repeating them can start a new charged signup or use up a verification
 attempt. They still wait out a `429 too_many_concurrent_verifications`, which
 never ran.
 Every other `4xx` is a final answer and is thrown on the first attempt,
@@ -1236,7 +1236,7 @@ without polling.
 
 ## WhatsApp
 
-Connect a number you own to WhatsApp (free to connect, no monthly fee), create
+Connect a number you own to WhatsApp ($9.99 one-time, no monthly fee), create
 Meta-reviewed message templates, and send on the `whatsapp` channel.
 Connecting the first number always ends with a human step: hand the
 `connectUrl` to your user - they open it in a browser and log in with
@@ -1270,7 +1270,10 @@ console.log(`Open ${signup.connectUrl} and log in with Facebook`);
 // After the Facebook step it stays 'registering' while WhatsApp activates the
 // number. Activation usually takes a few minutes but can take hours. If it
 // hasn't finished about 6 hours after the session began, the session fails
-// with registration_timeout. 'failed' comes with failureReasons.
+// with registration_timeout and the fee is refunded. 'failed' comes with
+// failureReasons. The one-time $9.99 connection fee is charged to your card
+// when you start connecting the number and refunded automatically if the
+// connection fails; it is not refundable once the number is connected.
 
 // 2. Create a template (Meta reviews it, usually 24-48h). category is
 // required (UTILITY, AUTHENTICATION or MARKETING) with no default, and an
@@ -1360,7 +1363,7 @@ const { iceBreakers, commands } =
 await sendly.whatsapp.senders.setCalling('+15125550123', { enabled: true });
 
 // Add another number to an account you already connected: no Facebook step.
-// Free, like a Facebook connection. WhatsApp sends the number a 6-digit code.
+// Same $9.99 fee, refunded if it fails. WhatsApp sends the number a 6-digit code.
 const account = senders.find((s) => s.status === 'active' && s.businessAccountId);
 const added = await sendly.whatsapp.signup.create({
   phoneNumber: '+15125550124',
@@ -1382,7 +1385,7 @@ await sendly.whatsapp.signup.resend(added.id, 'voice');
 name on file), `callingEnabled`, and `outboundCallingAllowed`, which is false
 for +1, +20, +84 and +234 numbers. A signup that is `verifying` carries
 `verificationMethod` and `verificationAttemptsRemaining`; after 5 wrong codes
-it fails with `verification_failed`. Calls carry
+it fails with `verification_failed` and the fee is refunded. Calls carry
 `channel` (`phone`, `whatsapp` or `browser`).
 
 `verificationCode` comes only from `signup.get()`. Until a code has been
@@ -1412,7 +1415,7 @@ Refusals worth handling:
   body carries `retryAfter: 3600` (read it as `error.response.retryAfter`)
   and the response a `Retry-After: 3600` header. The SDK retries it like any
   `5xx` before throwing. No send returns it.
-- `whatsapp_signup_limit_reached` (429): 5 failed signups in 24
+- `whatsapp_signup_limit_reached` (429): 5 failed, charged signups in 24
   hours. Final; try again the next day.
 - `whatsapp_window_closed` (422): free-form text or media outside the 24-hour
   window. Send an approved template instead.
@@ -1448,7 +1451,7 @@ Refusals worth handling:
 - Adding a number by code: `whatsapp_business_account_not_found` (404),
   `display_name_required` (400), `whatsapp_signup_in_progress` and
   `whatsapp_already_enabled` (409), and `whatsapp_verification_start_failed`
-  (422 refused, 503 unreachable). A Facebook
+  (422 refused, 503 unreachable; the fee is refunded either way). A Facebook
   `signup.create` for a number being added by code gets
   `whatsapp_verification_in_progress` (409). `verify`:
   `invalid_verification_code` (400, not 6 digits),

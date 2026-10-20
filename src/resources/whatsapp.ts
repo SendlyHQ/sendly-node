@@ -7,7 +7,7 @@
  * create Meta-reviewed message templates, and send via
  * `sendly.messages.send({ channel: 'whatsapp', ... })`.
  *
- * Connecting a number is free (no setup or monthly fee) and always
+ * Connecting a number costs a one-time $9.99 fee (no monthly fee) and always
  * ends with a human step: {@link WhatsAppSignupResource.create} returns a
  * `connectUrl` that a person must open in a browser and log in with
  * Facebook to link their WhatsApp Business Account. Hand the URL to your
@@ -65,7 +65,7 @@ import { validatePhoneNumber } from "../utils/validation";
  * - `registering` — the business account is linked; WhatsApp is activating
  *   the number. Activation usually takes a few minutes but can take hours.
  *   If it hasn't finished about 6 hours after the session began, the
- *   session fails with `registration_timeout`.
+ *   session fails with `registration_timeout` and the fee is refunded.
  * - `verifying`: a number being added to an already-connected WhatsApp
  *   Business Account is waiting for the code WhatsApp sent it; submit it
  *   with {@link WhatsAppSignupResource.verify}
@@ -161,8 +161,7 @@ export interface WhatsAppSignup {
   businessAccountId: string | null;
   /**
    * Why the signup failed, when status is `failed`; null otherwise. Holds
-   * one code: `setup_fee_payment_failed` (the connection couldn't be
-   * started), `signup_abandoned`,
+   * one code: `setup_fee_payment_failed`, `signup_abandoned`,
    * `meta_exchange_failed`, `registration_failed`, `waba_already_connected`,
    * `waba_mismatch` (the WhatsApp Business Account chosen in the Facebook
    * step doesn't hold the verified number), `registration_timeout`
@@ -170,7 +169,8 @@ export interface WhatsAppSignup {
    * `phone_number_mismatch`, or for a number added by code
    * `verification_start_failed` (WhatsApp wouldn't send the code),
    * `verification_failed` (too many wrong codes) or `verification_expired`
-   * (no correct code was entered before it expired).
+   * (no correct code was entered before it expired). If the connection
+   * fails, the $9.99 fee is refunded automatically.
    */
   failureReasons: string[] | null;
   /**
@@ -591,20 +591,24 @@ class WhatsAppSignupResource {
   /**
    * Start connecting a number to WhatsApp.
    *
-   * Connecting a number is free (no setup or monthly fee). Returns a
+   * Charges a one-time $9.99 connection fee per number (no monthly fee) to
+   * your card when the connection starts, and returns a
    * `connectUrl`. Completing the connection requires a human: hand the
    * URL to your user — they open it in a browser and log in with Facebook
    * to link their WhatsApp Business Account. Then poll
    * {@link WhatsAppSignupResource.get} until the status is `active`.
    *
    * Calling again for a number with an in-flight signup returns the
-   * existing signup (same `connectUrl`). Requires
+   * existing signup (same `connectUrl`) without charging again. Requires
    * a live API key with the `whatsapp:write` scope and, in a team
    * workspace, an owner or admin (`settings:write`). After the Facebook
    * step the signup stays `registering` while WhatsApp activates the
    * number. Activation usually takes a few minutes but can take hours. If
    * it hasn't finished about 6 hours after the session began, the session
-   * fails with `registration_timeout`.
+   * fails with `registration_timeout` and the fee is refunded. If the
+   * connection fails, the $9.99 fee is refunded automatically; once the
+   * number has connected it is not refundable, and a later disconnect gets
+   * nothing back.
    *
    * @param request - The number to connect
    * @returns The signup with its `connectUrl`
@@ -622,8 +626,8 @@ class WhatsAppSignupResource {
    * @throws {ValidationError} If the number is not E.164, not in your workspace, or not eligible
    * @throws {AuthenticationError} If the API key is invalid or a test key, lacks the `whatsapp:write` scope, or the workspace role isn't owner or admin (`insufficient_permissions`)
    * @throws {SendlyError} `whatsapp_requires_live_key` (403) with a test key
-   * @throws {SendlyError} `whatsapp_unavailable` (503) while WhatsApp connections are unavailable. Only signup returns it, with `retryAfter: 3600` in the body and a `Retry-After: 3600` header. The SDK retries it like any 5xx before throwing.
-   * @throws {SendlyError} `whatsapp_signup_limit_reached` (429) after 5 failed signups (or 20 cancelled) in 24 hours. Not retried; try again the next day.
+   * @throws {SendlyError} `whatsapp_unavailable` (503) while WhatsApp connections are unavailable; nothing is charged. Only signup returns it, with `retryAfter: 3600` in the body and a `Retry-After: 3600` header. The SDK retries it like any 5xx before throwing.
+   * @throws {SendlyError} `whatsapp_signup_limit_reached` (429) after 5 failed, charged signups (or 20 cancelled) in 24 hours. Not retried; try again the next day.
    * @throws {SendlyError} `whatsapp_verification_in_progress` (409) when the number is being added to a connected account by code; `error.response.id` is that signup
    */
   create(
@@ -633,21 +637,22 @@ class WhatsAppSignupResource {
    * Add a number to a WhatsApp Business Account this workspace has already
    * connected, without the Facebook step: pass `businessAccountId`.
    *
-   * Free, like a Facebook connection: WhatsApp sends the number a 6-digit
-   * code by text or voice call. The signup comes back
+   * Charges the same one-time $9.99 fee as a Facebook connection (refunded
+   * automatically if the connection fails), then WhatsApp sends the number
+   * a 6-digit code by text or voice call. The signup comes back
    * `verifying`, with no `connectUrl`. Submit the code with
    * {@link WhatsAppSignupResource.verify}; {@link WhatsAppSignupResource.get}
    * returns it as `verificationCode` once the text reaches the number.
    * Calling again for a number that is already verifying returns that
-   * signup without a second code, with two exceptions:
+   * signup without a second charge or a second code, with two exceptions:
    * if the first call stopped before the code was requested, the repeat
    * requests it (201); and a verifying signup more than 3 hours old is
-   * failed and a new one is started. The same
+   * failed and refunded, and a new charged one is started. The same
    * scopes, key and role rules apply as for a Facebook connection.
    *
    * A 5xx, a timeout or a network error is thrown at once, never retried:
-   * each attempt can start a new signup and ask WhatsApp for another code.
-   * Only a 429 the API never ran is retried.
+   * each attempt can start a new signup that is charged and, when it fails,
+   * refunded. Only a 429 the API never ran is retried.
    *
    * @param request - The number, the connected account's id, and optionally the code method and display name
    * @returns The `verifying` signup
@@ -668,7 +673,7 @@ class WhatsAppSignupResource {
    * @throws {SendlyError} `whatsapp_business_account_not_found` (404) if the account isn't connected in this workspace with an active number
    * @throws {SendlyError} `display_name_required` (400) if no display name was given and the account has none to reuse
    * @throws {SendlyError} `whatsapp_signup_in_progress` (409) while a Facebook connection for the number is in flight (`error.response.id` is that signup), or `whatsapp_already_enabled` (409) if it is already connected
-   * @throws {SendlyError} `whatsapp_verification_start_failed`: 422 when WhatsApp refused to send a code (final), or 503 when it couldn't be reached. Either way the signup failed; start again. Not retried automatically.
+   * @throws {SendlyError} `whatsapp_verification_start_failed`: 422 when WhatsApp refused to send a code (final), or 503 when it couldn't be reached. Either way the signup failed and the fee is refunded; start again. Not retried automatically.
    */
   create(request: AddWhatsAppNumberRequest): Promise<WhatsAppSignup>;
   create(request: StartWhatsAppSignupRequest): Promise<WhatsAppSignupSession>;
@@ -750,7 +755,7 @@ class WhatsAppSignupResource {
    *
    * @throws {SendlyError} `invalid_verification_code` (400) if the code isn't 6 digits
    * @throws {SendlyError} `whatsapp_verification_code_invalid` (422) for a wrong code; `error.response.attemptsRemaining` says how many tries are left
-   * @throws {SendlyError} `whatsapp_verification_failed` (409) after 5 wrong codes: the signup failed
+   * @throws {SendlyError} `whatsapp_verification_failed` (409) after 5 wrong codes: the signup failed and the fee is refunded
    * @throws {SendlyError} `whatsapp_verification_busy` (409) while another code for the number is being checked; try again in a moment
    * @throws {SendlyError} `signup_not_active` (409) if the signup isn't waiting for a code, or is more than 3 hours old
    * @throws {SendlyError} `whatsapp_verification_unavailable` (503) when WhatsApp couldn't check the code; the attempt isn't counted. `whatsapp_activation_pending` (503) when the code was accepted but the connection didn't finish; Sendly is alerted, so check back with {@link WhatsAppSignupResource.get}. Neither is retried automatically.
@@ -1310,7 +1315,7 @@ class WhatsAppTemplatesResource {
  *
  * @example
  * ```typescript
- * // 1. Connect a number (free, no monthly fee). The connect URL
+ * // 1. Connect a number ($9.99 one-time, no monthly fee). The connect URL
  * //    must be opened by a human — they log in with Facebook in a
  * //    browser to link their WhatsApp Business Account.
  * const signup = await sendly.whatsapp.signup.create({
