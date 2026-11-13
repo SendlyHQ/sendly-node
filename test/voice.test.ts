@@ -922,4 +922,43 @@ describe("Voice Resource", () => {
       );
     });
   });
+
+  describe("agents.test()", () => {
+    it("posts an empty body without an idempotency key and returns the result", async () => {
+      const result = {
+        ok: false,
+        outcome: "not_found",
+        message: "Your agent's server is up, but doesn't know \"desk\" (404).",
+        status: 404,
+        latencyMs: 31,
+        signed: false,
+        steps: [{ step: "reply", ok: false, detail: "SIP 404 Not Found" }],
+      };
+      fetchMock.mockResolvedValue(mockFetchResponse(result));
+
+      const out = await client.voice.agents.test("agent 1");
+
+      expect(out).toEqual(result);
+      expect(methodOfCall(fetchMock, 0)).toBe("POST");
+      expect(urlOfCall(fetchMock, 0).pathname).toBe("/api/v1/voice/agents/agent%201/test");
+      expect(bodyOfCall(fetchMock, 0)).toEqual({});
+      expect(keyOfCall(fetchMock, 0)).toBeUndefined();
+    });
+
+    it("sends settings to test and refuses a missing id before any request", async () => {
+      fetchMock.mockResolvedValue(mockFetchResponse({ ok: true, outcome: "ok", message: "", status: 200, latencyMs: 5, signed: false, steps: [] }));
+
+      await client.voice.agents.test("agent_1", {
+        kind: "sip",
+        connection: { uri: "sip:+15125550100@sip.example.com", transport: "tls" },
+      });
+
+      expect(bodyOfCall(fetchMock, 0)).toEqual({
+        kind: "sip",
+        connection: { uri: "sip:+15125550100@sip.example.com", transport: "tls" },
+      });
+      await expect(client.voice.agents.test("")).rejects.toThrow(/id/);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+  });
 });

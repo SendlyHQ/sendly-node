@@ -470,7 +470,9 @@ export interface UpdateVoiceAgentRequest {
   kind?: VoiceAgentKind;
   /**
    * Connection settings to change. With the same `kind`, it is merged into
-   * the saved connection: a secret left out is kept, `null` removes it.
+   * the saved connection: a secret left out is kept, `null` removes it. A
+   * saved secret is only sent to the host it was saved with, so moving the
+   * address to another host needs the secret again.
    */
   connection?: VoiceAgentConnectionInput;
   /**
@@ -499,6 +501,72 @@ export interface DeletedVoiceAgent {
   object: "voice_agent";
   /** Always true */
   deleted: true;
+}
+
+/**
+ * Settings to test with {@link VoiceAgentsResource.test}. Leave it out to
+ * test the saved connection.
+ */
+export interface TestVoiceAgentRequest {
+  /**
+   * The kind of the settings in `connection`. Defaults to the agent's own
+   * kind. Needed to test settings of another kind, such as on a `sendly`
+   * agent before switching it.
+   */
+  kind?: Exclude<VoiceAgentKind, "sendly">;
+  /**
+   * Settings to test instead of the saved ones. Nothing is saved. For the
+   * agent's own kind, a secret left out is taken from the saved connection
+   * while the host stays the same.
+   */
+  connection?: VoiceAgentConnectionInput;
+  /** For `custom_llm`: the system prompt to send. Defaults to the agent's instructions. */
+  instructions?: string;
+}
+
+/**
+ * What a connection test found. More values may be added.
+ */
+export type VoiceAgentTestOutcome =
+  | "ok"
+  | "blocked_destination"
+  | "unreachable"
+  | "timeout"
+  | "tls_failed"
+  | "auth_required"
+  | "auth_failed"
+  | "not_found"
+  | "rejected"
+  | "bad_reply"
+  | (string & {});
+
+/** One step of a connection test. */
+export interface VoiceAgentTestStep {
+  /** `address`, `connect`, `login` or `reply`. More values may be added. */
+  step: "address" | "connect" | "login" | "reply" | (string & {});
+  ok: boolean;
+  /** What happened at this step, in plain words */
+  detail: string;
+}
+
+/**
+ * Response from {@link VoiceAgentsResource.test}. A failed test is still a
+ * successful request: check `ok`.
+ */
+export interface VoiceAgentTest {
+  /** Whether the agent answered the way a call needs */
+  ok: boolean;
+  outcome: VoiceAgentTestOutcome;
+  /** One or two sentences to show a person: what happened and what to change */
+  message: string;
+  /** The HTTP or SIP status the agent answered with, or null */
+  status: number | null;
+  /** How long the agent took to answer, or null */
+  latencyMs: number | null;
+  /** Whether the request carried `X-Sendly-Signature`, as calls do. Always false for `sip` */
+  signed: boolean;
+  /** Each step tried, in order, up to the first that failed */
+  steps: VoiceAgentTestStep[];
 }
 
 /**
@@ -880,6 +948,56 @@ class VoiceAgentsResource {
       path,
       idempotencyKey: options?.idempotencyKey,
       body: agentBody(request ?? {}),
+    });
+  }
+
+  /**
+   * Test your own agent's connection the way a call would reach it, without
+   * placing one. Requires the `calls:write` scope and a live API key.
+   *
+   * `custom_llm` gets a signed, streamed chat completion with a test
+   * message. `websocket` gets a signed connection with `connected`, a
+   * `start` carrying `test: true`, half a second of silence and a `stop` with
+   * reason `test_finished`. `sip` gets an `OPTIONS` request, answered with
+   * the saved credentials if the server asks; a SIP server answering shows
+   * the address and credentials work, not which agent picks up.
+   *
+   * Pass `connection` to test settings before saving them. A workspace can
+   * run 10 tests a minute.
+   *
+   * @param id - Agent identifier
+   * @param request - Optional settings to test instead of the saved ones
+   * @returns What the test found; check `ok`
+   *
+   * @example
+   * ```typescript
+   * const result = await sendly.voice.agents.test('3c4d5e6f-7081-4293-a4b5-c6d7e8f90a1b');
+   * if (!result.ok) console.log(result.outcome, result.message);
+   *
+   * // Try a new address before saving it
+   * await sendly.voice.agents.test('3c4d5e6f-7081-4293-a4b5-c6d7e8f90a1b', {
+   *   connection: { uri: 'sip:+15125550100@sip.example.com', transport: 'tls' },
+   * });
+   * ```
+   *
+   * @throws {ValidationError} If `id` is missing, or `invalid_request` (400) when the agent is a `sendly` agent and no `kind` was sent, or `connection` breaks a rule
+   * @throws {SendlyError} `byo_agents_not_enabled` (403) when the workspace's bring-your-own-agent feature is off
+   * @throws {SendlyError} `agent_not_found` (404) when the agent isn't in this workspace
+   * @throws {RateLimitError} (429) after 10 tests in a minute
+   */
+  async test(id: string, request?: TestVoiceAgentRequest): Promise<VoiceAgentTest> {
+    const path = `${agentPath(id)}/test`;
+    const body: Record<string, unknown> = {
+      ...(request?.kind !== undefined && { kind: request.kind }),
+      ...(request?.connection !== undefined && { connection: request.connection }),
+      ...(request?.instructions !== undefined && { instructions: request.instructions }),
+    };
+
+    return this.http.request<VoiceAgentTest>({
+      method: "POST",
+      path,
+      body,
+      autoIdempotencyKey: false,
     });
   }
 
