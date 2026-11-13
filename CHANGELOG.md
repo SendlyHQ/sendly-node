@@ -1,5 +1,17 @@
 # @sendly/node
 
+## 4.6.0
+
+### Minor Changes
+
+- [#313](https://github.com/SendlyHQ/sendly/pull/313) [`9bc4974`](https://github.com/SendlyHQ/sendly/commit/9bc4974c2fc5a8e3d5e86a5073f1ae46ba72622a) Thanks [@sendly-live](https://github.com/sendly-live)! - Bring your own voice agent, in every SDK, the CLI and MCP: answer calls with your own model (`custom_llm`), SIP address (`sip`) or WebSocket server (`websocket`), and transfer a caller from your own server.
+  - Node: `sendly.voice.agents.create()` and `update()` take `kind` and `connection` (typed per kind; secrets are write-only, a secret left out is kept and `null` removes it), `update()` takes `rotateSigningSecret: true`, and both return `VoiceAgentWithSecret`, whose `signingSecret` is present only when one was just made. `VoiceAgent` gains `kind`, `connection` and `hasSigningSecret`. `Call` gains `agentKind`, `agentFallback` and `transfer`, `calls.list()` takes `agentKind`, and the new `sendly.calls.transfer(id, { to? })` posts to `/calls/:id/transfer` (202). The `agent_remote_hangup` and `agent_byo_failed` hangup classes and the `byo_agents_not_enabled`, `agent_kind_unsupported`, `transfer_to_required`, `outbound_not_enabled`, `call_not_active`, `call_not_transferable` and `transfer_in_progress` error codes are typed. Before this, `agents.create()` and `update()` dropped `kind` and `connection` from the request.
+  - MCP: `create_voice_agent` and `update_voice_agent` take `kind` and a per-kind `connection`, `update_voice_agent` takes `rotateSigningSecret`, `list_calls` takes `agentKind`, and the new `transfer_call` tool (175 tools) transfers a caller.
+
+- [#316](https://github.com/SendlyHQ/sendly/pull/316) [`f012423`](https://github.com/SendlyHQ/sendly/commit/f01242357d5d44c150cc35e470e6f76772cbec77) Thanks [@sendly-live](https://github.com/sendly-live)! - Test a voice agent's connection from every SDK, the CLI and MCP: `POST /voice/agents/:id/test` reaches your own agent (`custom_llm`, `sip` or `websocket`) the way a call would, without placing one, and reports what happened.
+  - Node: `sendly.voice.agents.test(id, { kind?, connection?, instructions? })` returns `VoiceAgentTest` (`ok`, `outcome`, `message`, `status`, `latencyMs`, `signed`, `steps`). Pass `connection` to test settings before saving them. A failed test is still a successful request: check `ok`. `TestVoiceAgentRequest`, `VoiceAgentTest`, `VoiceAgentTestOutcome` and `VoiceAgentTestStep` are exported.
+  - MCP: the new `test_voice_agent` tool (176 tools) takes `agentId` and optional `kind`, `connection` and `instructions`, and sends no idempotency key.
+
 ## 4.5.1
 
 ### Patch Changes
