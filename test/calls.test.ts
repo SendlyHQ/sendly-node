@@ -78,6 +78,9 @@ describe("Calls Resource", () => {
     creditsCharged: 0,
     billing: "metered",
     hangupClass: null,
+    agentKind: "sendly",
+    agentFallback: false,
+    transfer: null,
     recordingStatus: null,
     metadata: { crmId: "lead_8812" },
   };
@@ -353,6 +356,7 @@ describe("Calls Resource", () => {
         direction: "outbound",
         kind: "pstn",
         agentId,
+        agentKind: "websocket",
         to: "+15555550123",
         from: "+15555550188",
       });
@@ -365,6 +369,7 @@ describe("Calls Resource", () => {
       expect(params.get("direction")).toBe("outbound");
       expect(params.get("kind")).toBe("pstn");
       expect(params.get("agentId")).toBe(agentId);
+      expect(params.get("agentKind")).toBe("websocket");
       expect(params.get("to")).toBe("+15555550123");
       expect(params.get("from")).toBe("+15555550188");
       expect(urlOfCall(fetchMock, 0).search).toContain("to=%2B15555550123");
@@ -590,6 +595,124 @@ describe("Calls Resource", () => {
       } catch (error) {
         expect((error as SendlyError).code).toBe("call_not_found");
       }
+    });
+  });
+
+  describe("transfer()", () => {
+    const inbound: Call = {
+      ...mockRingingCall,
+      direction: "inbound",
+      status: "active",
+      from: "+15555550123",
+      to: "+15555550188",
+      answeredAt: "2026-09-12T14:03:19.000Z",
+      agentKind: "websocket",
+    };
+    const pending: Call = {
+      ...inbound,
+      transfer: { to: "+15125550142", status: "pending", failureReason: null },
+    };
+
+    it("should POST the number to the transfer path and return the pending call", async () => {
+      fetchMock.mockResolvedValue(mockFetchResponse(pending, 202));
+
+      const result = await client.calls.transfer(callId, { to: "+15125550142" });
+
+      expect(result.transfer).toEqual({
+        to: "+15125550142",
+        status: "pending",
+        failureReason: null,
+      });
+      expect(result.agentKind).toBe("websocket");
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringMatching(new RegExp(`/v1/calls/${callId}/transfer$`)),
+        expect.objectContaining({ method: "POST" }),
+      );
+      expect(bodyOfCall(fetchMock, 0)).toEqual({ to: "+15125550142" });
+    });
+
+    it("should send an empty body when 'to' is left out", async () => {
+      fetchMock.mockResolvedValue(mockFetchResponse(pending, 202));
+
+      await client.calls.transfer(callId);
+
+      expect(bodyOfCall(fetchMock, 0)).toEqual({});
+    });
+
+    it("should attach an automatic idempotency key and honour a caller key", async () => {
+      fetchMock.mockResolvedValue(mockFetchResponse(pending, 202));
+
+      await client.calls.transfer(callId);
+      await client.calls.transfer(callId, {}, { idempotencyKey: `transfer-${callId}` });
+
+      expect(keyOfCall(fetchMock, 0)).toMatch(/^sendly-node-retry-/);
+      expect(keyOfCall(fetchMock, 1)).toBe(`transfer-${callId}`);
+    });
+
+    it("should percent-encode the id and reject a missing one locally", async () => {
+      fetchMock.mockResolvedValue(mockFetchResponse(pending, 202));
+
+      await client.calls.transfer("call/1");
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("/v1/calls/call%2F1/transfer"),
+        expect.anything(),
+      );
+
+      await expect(client.calls.transfer("")).rejects.toThrow(ValidationError);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("should read a failed transfer and a fallback from the call", async () => {
+      fetchMock.mockResolvedValue(
+        mockFetchResponse({
+          ...inbound,
+          agentFallback: true,
+          transfer: { to: "+15125550142", status: "failed", failureReason: "busy" },
+        }),
+      );
+
+      const result = await client.calls.get(callId);
+
+      expect(result.agentFallback).toBe(true);
+      expect(result.transfer?.status).toBe("failed");
+      expect(result.transfer?.failureReason).toBe("busy");
+    });
+
+    it("should map 402 insufficient_credits to InsufficientCreditsError", async () => {
+      fetchMock.mockResolvedValue(
+        mockFetchResponse(
+          {
+            error: "insufficient_credits",
+            message: "Transfers need credits on the workspace. Current balance: 0.",
+            creditsNeeded: 1,
+            currentBalance: 0,
+          },
+          402,
+        ),
+      );
+
+      const error = await noRetryClient.calls
+        .transfer(callId, { to: "+15125550142" })
+        .catch((e) => e);
+      expect(error).toBeInstanceOf(InsufficientCreditsError);
+      expect((error as InsufficientCreditsError).creditsNeeded).toBe(1);
+    });
+
+    it.each([
+      [403, "outbound_not_enabled"],
+      [400, "transfer_to_required"],
+      [409, "call_not_active"],
+      [409, "call_not_transferable"],
+      [409, "transfer_in_progress"],
+    ])("should surface %s %s", async (status, code) => {
+      fetchMock.mockResolvedValue(
+        mockFetchResponse({ error: code, message: "Refused." }, status),
+      );
+
+      const error = await noRetryClient.calls.transfer(callId).catch((e) => e);
+      expect(error).toBeInstanceOf(SendlyError);
+      expect((error as SendlyError).code).toBe(code);
+      expect((error as SendlyError).statusCode).toBe(status);
     });
   });
 

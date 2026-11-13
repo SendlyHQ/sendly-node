@@ -184,6 +184,174 @@ export interface VoiceAgentTools {
 }
 
 /**
+ * Who answers a call:
+ * - `sendly` - Sendly writes the replies from the agent's instructions
+ * - `custom_llm` - Sendly listens and speaks, and your chat completions endpoint writes each reply
+ * - `sip` - Sendly connects the caller to your agent's SIP address
+ * - `websocket` - Sendly streams the call audio to your WebSocket server and plays back what it sends
+ *
+ * Your own agents (every kind but `sendly`) need the workspace's
+ * bring-your-own-agent feature. More values may be added.
+ */
+export type VoiceAgentKind =
+  | "sendly"
+  | "custom_llm"
+  | "sip"
+  | "websocket"
+  | (string & {});
+
+/** How a SIP call to your agent is carried. A `sips:` address always uses `tls`. */
+export type SipTransport = "auto" | "udp" | "tcp" | "tls" | (string & {});
+
+/** Whether the audio of a SIP call to your agent is encrypted. */
+export type SipMediaEncryption = "disable" | "allow" | "require" | (string & {});
+
+/** The audio format of a WebSocket agent, both ways. */
+export type WebSocketAudioFormat =
+  | "pcm16_16000"
+  | "pcm16_24000"
+  | "pcm16_8000"
+  | "mulaw_8000"
+  | (string & {});
+
+/**
+ * How Sendly reaches your model (`kind: "custom_llm"`).
+ */
+export interface VoiceAgentCustomLlmConnection {
+  /** Your endpoint. Sendly sends `POST {baseUrl}/chat/completions` with streaming on. */
+  baseUrl: string;
+  /** The model name sent in each request */
+  model: string;
+  /** The names of the extra headers sent with each request. Their values are secret and never returned. */
+  headerNames: string[];
+  /** True when an API key is saved. The key itself is never returned. */
+  hasApiKey: boolean;
+}
+
+/**
+ * Where Sendly connects the caller (`kind: "sip"`).
+ */
+export interface VoiceAgentSipConnection {
+  /** Your agent's SIP address, e.g. `sip:+15125550100@sip.example.com` */
+  uri: string;
+  /** How the call is carried */
+  transport: SipTransport;
+  /** Whether the call audio is encrypted */
+  mediaEncryption: SipMediaEncryption;
+  /** The digest auth username, or `null` */
+  username: string | null;
+  /** True when a password is saved. It is never returned. */
+  hasPassword: boolean;
+  /** Extra `X-` headers sent on the call */
+  headers: Record<string, string>;
+}
+
+/**
+ * Where Sendly streams the call (`kind: "websocket"`).
+ */
+export interface VoiceAgentWebSocketConnection {
+  /** Your `wss://` server */
+  url: string;
+  /** The audio format both ways */
+  audioFormat: WebSocketAudioFormat;
+  /** True when an auth token is saved. It is sent as `Authorization: Bearer` and never returned. */
+  hasAuthToken: boolean;
+  /** Sent to your server in the `start` message */
+  customParameters: Record<string, string>;
+}
+
+/**
+ * How Sendly reaches your own agent. The shape matches the agent's `kind`;
+ * secrets are never returned, only whether one is saved.
+ */
+export type VoiceAgentConnection =
+  | VoiceAgentCustomLlmConnection
+  | VoiceAgentSipConnection
+  | VoiceAgentWebSocketConnection;
+
+/**
+ * Connection settings for a `custom_llm` agent. On update, fields you
+ * leave out keep their saved values.
+ */
+export interface VoiceAgentCustomLlmConnectionInput {
+  /**
+   * An `https://` URL, up to 2,048 characters, with no credentials or `#`.
+   * A trailing `/` is dropped. Required when the agent becomes `custom_llm`.
+   */
+  baseUrl?: string;
+  /** 1 to 200 characters: letters, digits and `_ . : / @ + -`. Required when the agent becomes `custom_llm`. */
+  model?: string;
+  /** Sent as `Authorization: Bearer`. Left out keeps the saved key, `null` removes it. */
+  apiKey?: string | null;
+  /**
+   * Up to 10 extra headers with secret values. Replaces the saved set;
+   * `null` removes them. `Authorization`, `Content-Type`, `Host`,
+   * `User-Agent` and `X-Sendly-*` can't be set.
+   */
+  headers?: Record<string, string> | null;
+}
+
+/**
+ * Connection settings for a `sip` agent. On update, fields you leave out
+ * keep their saved values.
+ */
+export interface VoiceAgentSipConnectionInput {
+  /**
+   * `sip:` or `sips:` with a user part and a hostname (not an IP address),
+   * e.g. `sip:+15125550100@sip.example.com`. Only `;transport=` may follow.
+   * Required when the agent becomes `sip`.
+   */
+  uri?: string;
+  /**
+   * How the call is carried
+   * @default "tcp"
+   */
+  transport?: SipTransport;
+  /**
+   * Whether the call audio is encrypted. `require` needs the `tls` transport.
+   * @default "allow"
+   */
+  mediaEncryption?: SipMediaEncryption;
+  /** Digest auth username; `null` or `""` removes it */
+  username?: string | null;
+  /** Digest auth password. Left out keeps the saved one, `null` removes it. */
+  password?: string | null;
+  /** Up to 10 headers named `X-...`, not `X-Sendly-...`. Replaces the saved set; `null` removes them. */
+  headers?: Record<string, string> | null;
+}
+
+/**
+ * Connection settings for a `websocket` agent. On update, fields you
+ * leave out keep their saved values.
+ */
+export interface VoiceAgentWebSocketConnectionInput {
+  /** A `wss://` URL, up to 2,048 characters, with no credentials or `#`. Required when the agent becomes `websocket`. */
+  url?: string;
+  /**
+   * The audio format both ways
+   * @default "pcm16_16000"
+   */
+  audioFormat?: WebSocketAudioFormat;
+  /** Sent as `Authorization: Bearer`. Left out keeps the saved one, `null` removes it. */
+  authToken?: string | null;
+  /**
+   * Up to 20 string values (names of 1-40 letters, digits, `_ . : -`; values
+   * up to 500 characters) sent in the `start` message. Replaces the saved
+   * set; `null` removes them.
+   */
+  customParameters?: Record<string, string> | null;
+}
+
+/**
+ * How Sendly reaches your own agent, matching `kind`. Hosts must resolve to
+ * public internet addresses.
+ */
+export type VoiceAgentConnectionInput =
+  | VoiceAgentCustomLlmConnectionInput
+  | VoiceAgentSipConnectionInput
+  | VoiceAgentWebSocketConnectionInput;
+
+/**
  * An AI agent that answers and places phone calls.
  */
 export interface VoiceAgent {
@@ -195,6 +363,12 @@ export interface VoiceAgent {
   name: string;
   /** False when the agent is switched off; a switched-off agent can't be pointed at a number or put on a call */
   enabled: boolean;
+  /** Who answers the call: `sendly`, or one of your own (`custom_llm`, `sip`, `websocket`) */
+  kind: VoiceAgentKind;
+  /** How Sendly reaches your own agent, matching `kind`; `null` for a `sendly` agent */
+  connection: VoiceAgentConnection | null;
+  /** True when the agent has a signing secret. Your own agents do: Sendly signs every request to them with it. */
+  hasSigningSecret: boolean;
   /** Voice id, one of {@link VoiceVoicesResource.list} */
   voice: string;
   /** Human-readable voice name, e.g. `Ashley (US, warm)` */
@@ -217,6 +391,21 @@ export interface VoiceAgent {
   createdAt: string;
   /** When the agent last changed (ISO 8601) */
   updatedAt: string;
+}
+
+/**
+ * The agent as {@link VoiceAgentsResource.create} and
+ * {@link VoiceAgentsResource.update} return it.
+ */
+export interface VoiceAgentWithSecret extends VoiceAgent {
+  /**
+   * The agent's signing secret, present only when one was just made: on
+   * creating your own agent, on switching a `sendly` agent to one of your
+   * own, and on `rotateSigningSecret`. Save it now; it is never shown again.
+   * Sendly signs every request to your agent with it in the
+   * `X-Sendly-Signature` header (`t=<unix>,v1=<hex HMAC-SHA256>`).
+   */
+  signingSecret?: string;
 }
 
 /**
@@ -243,6 +432,15 @@ export interface CreateVoiceAgentRequest {
   instructions?: string;
   /** What the agent may do on a call. `sendSms` defaults to `true`, `transferTo` to `null`, `backgroundAudio` to `false`. */
   tools?: Partial<VoiceAgentTools>;
+  /**
+   * Who answers the call. One of your own (`custom_llm`, `sip`,
+   * `websocket`) needs the workspace's bring-your-own-agent feature and a
+   * `connection`.
+   * @default "sendly"
+   */
+  kind?: VoiceAgentKind;
+  /** How Sendly reaches your own agent, matching `kind`. Required for every kind but `sendly`. */
+  connection?: VoiceAgentConnectionInput;
 }
 
 /**
@@ -264,6 +462,23 @@ export interface UpdateVoiceAgentRequest {
   instructions?: string;
   /** Tool settings to change */
   tools?: Partial<VoiceAgentTools>;
+  /**
+   * Switch who answers the call. Switching to one of your own needs a
+   * `connection`; switching to `sendly` removes the connection and the
+   * signing secret.
+   */
+  kind?: VoiceAgentKind;
+  /**
+   * Connection settings to change. With the same `kind`, it is merged into
+   * the saved connection: a secret left out is kept, `null` removes it.
+   */
+  connection?: VoiceAgentConnectionInput;
+  /**
+   * `true` makes a new signing secret for your own agent; the response
+   * carries it once in `signingSecret`. The old one stops working straight
+   * away.
+   */
+  rotateSigningSecret?: true;
 }
 
 /**
@@ -336,6 +551,11 @@ function agentBody(request: UpdateVoiceAgentRequest): Record<string, unknown> {
       instructions: request.instructions,
     }),
     ...(request.tools !== undefined && { tools: request.tools }),
+    ...(request.kind !== undefined && { kind: request.kind }),
+    ...(request.connection !== undefined && {
+      connection: request.connection,
+    }),
+    ...(request.rotateSigningSecret === true && { rotateSigningSecret: true }),
   };
 }
 
@@ -543,9 +763,14 @@ class VoiceAgentsResource {
    * so it can text callers; `canSendSms` says whether it has one. A
    * workspace can have up to 20 agents.
    *
-   * @param request - The agent's name, voice, greeting, instructions and tools
+   * Pass `kind` and `connection` to answer with your own agent instead:
+   * your chat completions endpoint (`custom_llm`), your SIP address (`sip`)
+   * or your WebSocket server (`websocket`). The response then carries
+   * `signingSecret` once; save it to check that requests come from Sendly.
+   *
+   * @param request - The agent's name, voice, greeting, instructions, tools, and for your own agent its kind and connection
    * @param options - Optional idempotency key
-   * @returns The new agent
+   * @returns The new agent, with `signingSecret` for your own agent
    *
    * @example
    * ```typescript
@@ -557,21 +782,31 @@ class VoiceAgentsResource {
    *   tools: { sendSms: true },
    * });
    * console.log(agent.id, agent.canSendSms);
+   *
+   * // Answer with your own agent on a SIP address
+   * const own = await sendly.voice.agents.create({
+   *   name: 'Front desk',
+   *   kind: 'sip',
+   *   connection: { uri: 'sip:frontdesk@sip.example.com', transport: 'tls' },
+   *   tools: { transferTo: '+15125550142' },
+   * });
+   * console.log(own.signingSecret); // shown once
    * ```
    *
-   * @throws {ValidationError} If `name` is missing, or `invalid_request` (400) naming the field the API rejected
+   * @throws {ValidationError} If `name` is missing, or `invalid_request` (400) naming the field the API rejected, including `connection.<field>` when the connection is missing or breaks a rule
+   * @throws {SendlyError} `byo_agents_not_enabled` (403) when `kind` is one of your own and the workspace's bring-your-own-agent feature is off
    * @throws {SendlyError} `agent_limit` (409) when the workspace already has 20 agents
    */
   async create(
     request: CreateVoiceAgentRequest,
     options?: IdempotentRequestOptions,
-  ): Promise<VoiceAgent> {
+  ): Promise<VoiceAgentWithSecret> {
     if (!request || typeof request !== "object") {
       throw new ValidationError("An agent 'name' is required");
     }
     requireText(request.name, "An agent 'name' is required");
 
-    return this.http.request<VoiceAgent>({
+    return this.http.request<VoiceAgentWithSecret>({
       method: "POST",
       path: "/voice/agents",
       idempotencyKey: options?.idempotencyKey,
@@ -605,12 +840,14 @@ class VoiceAgentsResource {
    * Update an agent. Requires the `calls:write` scope and a live API key.
    *
    * Send only the fields that change; `tools` keys you leave out keep their
-   * current values. Changes apply to the next call the agent takes.
+   * current values, and `connection` is merged into the saved one (a secret
+   * left out is kept, `null` removes it). Changes apply to the next call the
+   * agent takes.
    *
    * @param id - Agent identifier
-   * @param request - Any subset of the create fields
+   * @param request - Any subset of the create fields, plus `rotateSigningSecret`
    * @param options - Optional idempotency key
-   * @returns The agent after the change
+   * @returns The agent after the change, with `signingSecret` when one was just made
    *
    * @example
    * ```typescript
@@ -618,19 +855,27 @@ class VoiceAgentsResource {
    *   greeting: 'Thanks for calling Acme. How can I help today?',
    *   tools: { sendSms: false },
    * });
+   *
+   * // Replace your own agent's signing secret
+   * const { signingSecret } = await sendly.voice.agents.update(
+   *   '3c4d5e6f-7081-4293-a4b5-c6d7e8f90a1b',
+   *   { rotateSigningSecret: true },
+   * );
    * ```
    *
-   * @throws {ValidationError} If `id` is missing, or `invalid_request` (400) naming the field the API rejected
+   * @throws {ValidationError} If `id` is missing, or `invalid_request` (400) naming the field the API rejected, including a `connection` that breaks a rule or is missing when `kind` changes, and `rotateSigningSecret` on a `sendly` agent
+   * @throws {SendlyError} `byo_agents_not_enabled` (403) when the change needs the workspace's bring-your-own-agent feature, which is off
    * @throws {SendlyError} `agent_not_found` (404) when the agent isn't in this workspace
+   * @throws {SendlyError} `agent_in_use` (409) when `enabled` is `false` while numbers still answer with the agent
    */
   async update(
     id: string,
     request: UpdateVoiceAgentRequest,
     options?: IdempotentRequestOptions,
-  ): Promise<VoiceAgent> {
+  ): Promise<VoiceAgentWithSecret> {
     const path = agentPath(id);
 
-    return this.http.request<VoiceAgent>({
+    return this.http.request<VoiceAgentWithSecret>({
       method: "PATCH",
       path,
       idempotencyKey: options?.idempotencyKey,

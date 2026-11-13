@@ -96,6 +96,9 @@ describe("Voice Resource", () => {
     object: "voice_agent",
     name: "Front desk",
     enabled: true,
+    kind: "sendly",
+    connection: null,
+    hasSigningSecret: false,
     voice: "ashley",
     voiceLabel: "Ashley (US, warm)",
     language: "en-US",
@@ -640,6 +643,184 @@ describe("Voice Resource", () => {
         client.voice.agents.update("", { name: "Front desk" }),
       ).rejects.toThrow(ValidationError);
       expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("your own agents", () => {
+    const sipAgent: VoiceAgent = {
+      ...mockAgent,
+      kind: "sip",
+      connection: {
+        uri: "sip:frontdesk@sip.example.com",
+        transport: "tls",
+        mediaEncryption: "allow",
+        username: "frontdesk",
+        hasPassword: true,
+        headers: { "X-Site": "austin" },
+      },
+      hasSigningSecret: true,
+    };
+
+    it("should send kind and connection on create and return the one-time signing secret", async () => {
+      fetchMock.mockResolvedValue(
+        mockFetchResponse({ ...sipAgent, signingSecret: "whsec_once" }, 201),
+      );
+
+      const result = await client.voice.agents.create({
+        name: "Front desk",
+        kind: "sip",
+        connection: {
+          uri: "sip:frontdesk@sip.example.com",
+          transport: "tls",
+          username: "frontdesk",
+          password: "s3cret",
+          headers: { "X-Site": "austin" },
+        },
+      });
+
+      expect(bodyOfCall(fetchMock, 0)).toEqual({
+        name: "Front desk",
+        kind: "sip",
+        connection: {
+          uri: "sip:frontdesk@sip.example.com",
+          transport: "tls",
+          username: "frontdesk",
+          password: "s3cret",
+          headers: { "X-Site": "austin" },
+        },
+      });
+      expect(result.signingSecret).toBe("whsec_once");
+      expect(result.hasSigningSecret).toBe(true);
+      expect(result.connection).toEqual(sipAgent.connection);
+    });
+
+    it("should pass a null secret through so the API removes it, and leave out what was not given", async () => {
+      fetchMock.mockResolvedValue(mockFetchResponse(sipAgent));
+
+      await client.voice.agents.update(agentId, {
+        connection: { password: null },
+      });
+
+      expect(bodyOfCall(fetchMock, 0)).toEqual({ connection: { password: null } });
+    });
+
+    it("should switch kind with a websocket connection", async () => {
+      fetchMock.mockResolvedValue(
+        mockFetchResponse({
+          ...mockAgent,
+          kind: "websocket",
+          connection: {
+            url: "wss://agent.example.com/sendly",
+            audioFormat: "mulaw_8000",
+            hasAuthToken: true,
+            customParameters: { tenant: "acme" },
+          },
+          hasSigningSecret: true,
+          signingSecret: "whsec_new",
+        }),
+      );
+
+      const result = await client.voice.agents.update(agentId, {
+        kind: "websocket",
+        connection: {
+          url: "wss://agent.example.com/sendly",
+          audioFormat: "mulaw_8000",
+          authToken: "tok_1",
+          customParameters: { tenant: "acme" },
+        },
+      });
+
+      expect(bodyOfCall(fetchMock, 0)).toEqual({
+        kind: "websocket",
+        connection: {
+          url: "wss://agent.example.com/sendly",
+          audioFormat: "mulaw_8000",
+          authToken: "tok_1",
+          customParameters: { tenant: "acme" },
+        },
+      });
+      expect(result.kind).toBe("websocket");
+      expect(result.signingSecret).toBe("whsec_new");
+    });
+
+    it("should send a custom_llm connection on create", async () => {
+      fetchMock.mockResolvedValue(
+        mockFetchResponse(
+          {
+            ...mockAgent,
+            kind: "custom_llm",
+            connection: {
+              baseUrl: "https://llm.example.com/v1",
+              model: "acme-voice-1",
+              headerNames: ["X-Tenant"],
+              hasApiKey: true,
+            },
+            hasSigningSecret: true,
+            signingSecret: "whsec_llm",
+          },
+          201,
+        ),
+      );
+
+      const result = await client.voice.agents.create({
+        name: "Front desk",
+        kind: "custom_llm",
+        connection: {
+          baseUrl: "https://llm.example.com/v1",
+          model: "acme-voice-1",
+          apiKey: "sk-test",
+          headers: { "X-Tenant": "acme" },
+        },
+      });
+
+      expect(bodyOfCall(fetchMock, 0).connection).toEqual({
+        baseUrl: "https://llm.example.com/v1",
+        model: "acme-voice-1",
+        apiKey: "sk-test",
+        headers: { "X-Tenant": "acme" },
+      });
+      expect(result.connection).toEqual({
+        baseUrl: "https://llm.example.com/v1",
+        model: "acme-voice-1",
+        headerNames: ["X-Tenant"],
+        hasApiKey: true,
+      });
+    });
+
+    it("should send rotateSigningSecret only as true", async () => {
+      fetchMock.mockResolvedValue(
+        mockFetchResponse({ ...sipAgent, signingSecret: "whsec_rotated" }),
+      );
+
+      const result = await client.voice.agents.update(agentId, {
+        rotateSigningSecret: true,
+      });
+      expect(bodyOfCall(fetchMock, 0)).toEqual({ rotateSigningSecret: true });
+      expect(result.signingSecret).toBe("whsec_rotated");
+
+      await client.voice.agents.update(agentId, {
+        rotateSigningSecret: false as unknown as true,
+      });
+      expect(bodyOfCall(fetchMock, 1)).toEqual({});
+    });
+
+    it("should surface byo_agents_not_enabled on 403", async () => {
+      fetchMock.mockResolvedValue(
+        mockFetchResponse(
+          {
+            error: "byo_agents_not_enabled",
+            message: "Your own agents aren't switched on for this workspace. Contact support.",
+          },
+          403,
+        ),
+      );
+
+      const error = await noRetryClient.voice.agents
+        .create({ name: "Front desk", kind: "sip", connection: { uri: "sip:a@sip.example.com" } })
+        .catch((e) => e);
+      expect(error).toBeInstanceOf(SendlyError);
+      expect((error as SendlyError).code).toBe("byo_agents_not_enabled");
+      expect((error as SendlyError).statusCode).toBe(403);
     });
   });
 

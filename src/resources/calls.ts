@@ -26,6 +26,7 @@
 import type { HttpClient } from "../utils/http";
 import type { IdempotentRequestOptions } from "../types";
 import { ValidationError } from "../errors";
+import type { VoiceAgentKind } from "./voice";
 
 /**
  * Where a call is in its lifecycle. `ringing` and `active` are live; the
@@ -111,8 +112,38 @@ export type CallHangupClass =
   | "agent_dispatch_failed"
   | "agent_api_unreachable"
   | "agent_already_ended"
+  | "agent_remote_hangup"
+  | "agent_byo_failed"
   | "ended"
   | (string & {});
+
+/**
+ * Why a transfer failed. `unknown` when no definite answer came back. More
+ * values may be added.
+ */
+export type CallTransferFailureReason =
+  | "busy"
+  | "no_answer"
+  | "declined"
+  | "unavailable"
+  | "unknown"
+  | (string & {});
+
+/**
+ * The latest transfer on a call.
+ */
+export interface CallTransfer {
+  /** The number the caller is transferred to, in E.164 */
+  to: string;
+  /**
+   * `pending` while the number rings, `completed` once the caller was handed
+   * over, `failed` when the transfer did not go through and the caller is
+   * still on the call
+   */
+  status: "pending" | "completed" | "failed" | (string & {});
+  /** Why the transfer failed; `null` unless `status` is `failed` */
+  failureReason: CallTransferFailureReason | null;
+}
 
 /**
  * One line of an agent call's transcript.
@@ -182,11 +213,26 @@ export interface Call {
    * `tools.transferTo` number), `voicemail` (an outbound agent call reached
    * voicemail and the agent left a message), `voicemail_unavailable` (an
    * outbound agent call reached a mailbox that could not take a message).
+   * Your own agent: `agent_remote_hangup` (your agent ended the call),
+   * `agent_byo_failed` (your agent could not be reached and nobody else
+   * could take the call).
    * Setup problems: `setup_failed`, `agent_dispatch_failed`,
    * `agent_api_unreachable`, `agent_already_ended`. Anything unrecognised
    * is reported as `ended`.
    */
   hangupClass: CallHangupClass | null;
+  /**
+   * Which kind of agent answered: `sendly`, or one of your own
+   * (`custom_llm`, `sip`, `websocket`). `null` when no agent handled the call.
+   */
+  agentKind: VoiceAgentKind | null;
+  /**
+   * True when your own agent could not be reached, so Sendly said a short
+   * line and transferred the caller or took a message.
+   */
+  agentFallback: boolean;
+  /** The latest transfer on the call, or `null` when it was never transferred */
+  transfer: CallTransfer | null;
   /** `recording`, `ready`, `failed`, or `null` when nothing was recorded */
   recordingStatus: CallRecordingStatus;
   /** The map you attached on create (`{}` when none) */
@@ -247,6 +293,11 @@ export interface ListCallsOptions {
   kind?: CallKind;
   /** Only calls handled by this agent */
   agentId?: string;
+  /**
+   * Only calls answered by this kind of agent. Calls from before agent kinds
+   * existed count as `sendly`.
+   */
+  agentKind?: VoiceAgentKind;
   /** Only calls to this E.164 number (exact match) */
   to?: string;
   /** Only calls from this E.164 number (exact match) */
@@ -269,6 +320,20 @@ export interface CallListResponse {
     /** True when `offset + data.length < total` */
     hasMore: boolean;
   };
+}
+
+/**
+ * Request for {@link CallsResource.transfer}.
+ */
+export interface TransferCallRequest {
+  /**
+   * The number to transfer the caller to, in E.164: US or Canadian, not
+   * premium-rate, not the number the caller dialled, and not a number the
+   * agent answers. Left out, the agent's transfer number
+   * (`tools.transferTo`) is used. Any other number needs calling out
+   * switched on for the workspace.
+   */
+  to?: string;
 }
 
 /**
@@ -313,6 +378,9 @@ export interface CallRecording {
  * const current = await sendly.calls.get(call.id);
  * console.log(current.status, current.hangupClass, current.transcript);
  *
+ * // Hand the caller on an incoming call to a person
+ * await sendly.calls.transfer(call.id, { to: '+15125550142' });
+ *
  * // Fetch the recording when it is ready
  * const recording = await sendly.calls.recording(call.id);
  * if (recording.status === 'ready') console.log(recording.url);
@@ -351,6 +419,7 @@ export class CallsResource {
    * @throws {ValidationError} If `to` or `agentId` is missing
    * @throws {SendlyError} `voice_not_enabled` (404) when voice isn't switched on for the workspace
    * @throws {SendlyError} `agent_not_found` (404) / `agent_disabled` (409)
+   * @throws {SendlyError} `agent_kind_unsupported` (409) when the agent's `kind` is `sip` or `websocket`, which answer incoming calls only
    * @throws {SendlyError} `from_number_required` (400) when the workspace has several voice-enabled numbers and `from` is missing
    * @throws {SendlyError} `e911_required` (428) when the number has no emergency address
    * @throws {InsufficientCreditsError} When the balance is below one minute at the agent rate
@@ -384,7 +453,7 @@ export class CallsResource {
   /**
    * List calls, newest first. Requires the `calls:read` scope.
    *
-   * @param options - Pagination and filters (`status`, `direction`, `kind`, `agentId`, `to`, `from`)
+   * @param options - Pagination and filters (`status`, `direction`, `kind`, `agentId`, `agentKind`, `to`, `from`)
    * @returns The page and pagination info
    *
    * @example
@@ -410,6 +479,7 @@ export class CallsResource {
         direction: options.direction,
         kind: options.kind,
         agentId: options.agentId,
+        agentKind: options.agentKind,
         to: options.to,
         from: options.from,
       },
@@ -475,6 +545,56 @@ export class CallsResource {
       path: `/calls/${encodeURIComponent(id)}/hangup`,
       idempotencyKey: options?.idempotencyKey,
       body: {},
+    });
+  }
+
+  /**
+   * Transfer the caller on an incoming phone call to another number,
+   * whatever kind of agent is on the call. Requires the `calls:write` scope
+   * and a live API key.
+   *
+   * Resolves at once (HTTP 202) with `transfer.status: "pending"`. Follow
+   * the outcome with {@link CallsResource.get}: `transfer.status` becomes
+   * `completed`, and the call ends with `hangupClass: "transferred"`, or
+   * `failed` with a `failureReason`, leaving the caller on the call. The
+   * workspace needs credits left.
+   *
+   * @param id - Call identifier
+   * @param request - `to`; leave it out to use the agent's transfer number
+   * @param options - Optional idempotency key
+   * @returns The call, with `transfer.status` `pending`
+   *
+   * @example
+   * ```typescript
+   * const call = await sendly.calls.transfer('6f1c2d3e-4a5b-4c6d-8e9f-0a1b2c3d4e5f', {
+   *   to: '+15125550142',
+   * });
+   * console.log(call.transfer); // { to: '+15125550142', status: 'pending', failureReason: null }
+   * ```
+   *
+   * @throws {ValidationError} If `id` is missing, or `invalid_request` (400) when `to` is not a US or Canadian number in E.164, is premium-rate, is the number the caller dialled, or is a number the agent answers
+   * @throws {SendlyError} `transfer_to_required` (400) when `to` is left out and the agent has no transfer number
+   * @throws {InsufficientCreditsError} When the workspace has no credits left
+   * @throws {SendlyError} `outbound_not_enabled` (403) when `to` is not the agent's transfer number and calling out is not switched on for the workspace
+   * @throws {SendlyError} `call_not_found` (404) when the call isn't in this workspace
+   * @throws {SendlyError} `call_not_active` (409) when the call is not in progress, `call_not_transferable` (409) when it is not an incoming phone call, `transfer_in_progress` (409) when a transfer is already under way or the call has had 3 transfer attempts
+   */
+  async transfer(
+    id: string,
+    request: TransferCallRequest = {},
+    options?: IdempotentRequestOptions,
+  ): Promise<Call> {
+    if (!id || typeof id !== "string") {
+      throw new ValidationError("A call 'id' is required");
+    }
+
+    return this.http.request<Call>({
+      method: "POST",
+      path: `/calls/${encodeURIComponent(id)}/transfer`,
+      idempotencyKey: options?.idempotencyKey,
+      body: {
+        ...(request?.to !== undefined && { to: request.to }),
+      },
     });
   }
 

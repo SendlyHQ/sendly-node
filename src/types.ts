@@ -2287,6 +2287,20 @@ export type SendlyErrorCode =
   | "voice_unavailable"
   | "live_key_required"
   | "voice_internal_error"
+  /** Your own agents (a `kind` other than `sendly`) are not switched on for the workspace (HTTP 403) */
+  | "byo_agents_not_enabled"
+  /** A SIP or WebSocket agent answers incoming calls only (HTTP 409) */
+  | "agent_kind_unsupported"
+  /** No transfer `to` was given and the agent has no transfer number (HTTP 400) */
+  | "transfer_to_required"
+  /** A transfer to a number other than the agent's needs calling out switched on for the workspace (HTTP 403) */
+  | "outbound_not_enabled"
+  /** The call is not in progress (HTTP 409) */
+  | "call_not_active"
+  /** Only incoming phone calls can be transferred (HTTP 409) */
+  | "call_not_transferable"
+  /** A transfer is already under way, or the call has had 3 transfer attempts (HTTP 409) */
+  | "transfer_in_progress"
   | "forbidden"
   | "invalid_idempotency_key"
   | "idempotency_key_mismatch"
