@@ -12,6 +12,7 @@
  */
 import type { HttpClient } from "../utils/http";
 import type {
+  IdempotentRequestOptions,
   ShortCode,
   ShortCodeApplicationInput,
   ShortCodeApplicationView,
@@ -58,6 +59,7 @@ class ShortCodeApplicationResource {
    * Requires the `short_codes:write` scope.
    *
    * @param application - The answers to save
+   * @param options - Optional idempotency key, so a repeat of the same save returns the first answer
    * @returns The saved application
    *
    * @example
@@ -72,10 +74,12 @@ class ShortCodeApplicationResource {
    */
   async update(
     application: ShortCodeApplicationInput,
+    options?: IdempotentRequestOptions,
   ): Promise<ShortCodeApplicationView> {
     return this.http.request<ShortCodeApplicationView>({
       method: "PUT",
       path: "/short_codes/application",
+      idempotencyKey: options?.idempotencyKey,
       body: application,
     });
   }
@@ -118,6 +122,7 @@ class ShortCodeApplicationResource {
    * Requires the `short_codes:write` scope.
    *
    * @param application - `acceptTerms`, plus optional final answers saved before the check
+   * @param options - Optional idempotency key, so a repeat of the same submit returns the first answer
    * @returns The submitted application, with `payment` saying whether this call charged the fee
    *
    * @example
@@ -134,10 +139,12 @@ class ShortCodeApplicationResource {
    */
   async submit(
     application: ShortCodeSubmitInput = {},
+    options?: IdempotentRequestOptions,
   ): Promise<ShortCodeApplicationView> {
     return this.http.request<ShortCodeApplicationView>({
       method: "POST",
       path: "/short_codes/application/submit",
+      idempotencyKey: options?.idempotencyKey,
       body: application,
     });
   }

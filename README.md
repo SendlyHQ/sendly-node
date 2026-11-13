@@ -176,7 +176,14 @@ const scheduled = await sendly.messages.schedule({
 
 console.log(`Scheduled: ${scheduled.id}`);
 console.log(`Will send at: ${scheduled.scheduledAt}`);
+```
 
+`timezone` (such as `'America/New_York'`) is stored with the scheduled message
+and returned as sent; without it the API stores `UTC`. It is a label only and
+does not change when the message goes: `scheduledAt` is read as given, so
+include its offset or `Z`.
+
+```typescript
 // List scheduled messages
 const { data: scheduledMessages } = await sendly.messages.listScheduled();
 
@@ -392,6 +399,10 @@ await sendly.messages.send(
 );
 ```
 
+`whatsapp.signup.create`, `whatsapp.templates.create`,
+`shortCodes.application.update` and `shortCodes.application.submit` take the
+same `{ idempotencyKey }` as their last argument.
+
 Reusing a key within 24 hours returns the original response. Reusing it with a
 different body returns `422 idempotency_key_mismatch`, so derive keys from
 something stable in your domain, like an order id. `sendBatch` sends no
@@ -467,6 +478,12 @@ Repeated failures trip a circuit breaker and deliveries stop. Once your
 endpoint is healthy again, reset the circuit, then replay what was missed:
 
 ```typescript
+// 0. See what a recovery would send, without sending anything
+const preview = await sendly.webhooks.recoveryPreview('whk_xxx', {
+  since: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(), // at most 7 days back
+});
+console.log(preview.auditFailures.total, preview.missingFromMessages.total);
+
 // 1. Close the circuit (otherwise replay/backfill answer 409)
 await sendly.webhooks.resetCircuit('whk_xxx');
 
@@ -906,6 +923,8 @@ counts, tags, labels, and an AI reply suggester.
 ```typescript
 // List and read threads
 const { data: conversations, pagination } = await sendly.conversations.list({ status: 'active' });
+// Only threads carrying a label (by label id)
+const vip = await sendly.conversations.list({ label: 'lbl_xxx' });
 const thread = await sendly.conversations.get(conversations[0].id, {
   includeMessages: true,
   messageLimit: 50,
@@ -2345,8 +2364,12 @@ Three provisioning modes:
 // Create
 const ws = await client.enterprise.workspaces.create({ name: 'Acme Insurance' });
 
-// List
-const { workspaces } = await client.enterprise.workspaces.list();
+// List (filters: search, status, verification, sort, tags, compact, page, limit)
+const { workspaces } = await client.enterprise.workspaces.list({
+  search: 'acme',
+  verification: 'unverified',
+  sort: 'name_asc',
+});
 
 // Get details
 const detail = await client.enterprise.workspaces.get(ws.id);

@@ -330,6 +330,73 @@ describe("WhatsApp extras", () => {
     updatedAt: "2026-09-30T10:00:00.000Z",
   };
 
+  describe("caller idempotency keys", () => {
+    const keyOf = (index = 0) =>
+      (fetchMock.mock.calls[index][1].headers as Record<string, string>)[
+        "Idempotency-Key"
+      ];
+
+    it("signup.create() sends the key it is given", async () => {
+      fetchMock.mockResolvedValue(
+        mockFetchResponse(
+          { id: "wsu_1", status: "initiated", connectUrl: "https://example.com/c" },
+          201,
+        ),
+      );
+
+      await client.whatsapp.signup.create(
+        { phoneNumber: PHONE },
+        { idempotencyKey: "connect-acme-1" },
+      );
+
+      expect(keyOf()).toBe("connect-acme-1");
+      expect(bodyOf(fetchMock)).toEqual({ phoneNumber: PHONE });
+    });
+
+    it("signup.create() with businessAccountId sends the key it is given", async () => {
+      fetchMock.mockResolvedValue(mockFetchResponse(verifying, 201));
+
+      await client.whatsapp.signup.create(
+        { phoneNumber: PHONE, businessAccountId: "102938475610293" },
+        { idempotencyKey: "add-acme-1" },
+      );
+
+      expect(keyOf()).toBe("add-acme-1");
+    });
+
+    it("signup.create() still sends a generated key without one", async () => {
+      fetchMock.mockResolvedValue(mockFetchResponse(verifying, 201));
+
+      await client.whatsapp.signup.create({
+        phoneNumber: PHONE,
+        businessAccountId: "102938475610293",
+      });
+
+      expect(keyOf()).toMatch(/\S+/);
+    });
+
+    it("templates.create() sends the key it is given", async () => {
+      fetchMock.mockResolvedValue(
+        mockFetchResponse({ id: "wat_1", name: "order_shipped", status: "PENDING" }, 201),
+      );
+
+      await client.whatsapp.templates.create(
+        {
+          sender: PHONE,
+          name: "order_shipped",
+          language: "en_US",
+          category: "UTILITY",
+          body: "Hi {{1}}, your order shipped",
+          examples: { "1": "Sam" },
+        },
+        { idempotencyKey: "tpl-order-shipped" },
+      );
+
+      expect(keyOf()).toBe("tpl-order-shipped");
+      expect(fetchMock.mock.calls[0][0]).toContain("/v1/whatsapp/templates");
+    });
+  });
+
   describe("signup.create() with businessAccountId", () => {
     it("adds a number to a connected account and returns the verifying signup", async () => {
       fetchMock.mockResolvedValue(mockFetchResponse(verifying, 201));

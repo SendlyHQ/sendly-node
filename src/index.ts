@@ -262,6 +262,8 @@ export type {
   WebhookTestDelivery,
   WebhookSecretRotation,
   WebhookEventTypeDetail,
+  WebhookRecoveryPreview,
+  WebhookRecoveryPreviewOptions,
 } from "./types";
 
 // Types - Short codes
@@ -364,6 +366,10 @@ export type {
   EnterpriseAccount,
   EnterpriseWorkspaceSummary,
   EnterpriseWorkspace,
+  ListEnterpriseWorkspacesOptions,
+  EnterpriseWorkspaceList,
+  EnterpriseWorkspaceCompactList,
+  EnterpriseWorkspacesSummary,
   EnterpriseWorkspaceDetail,
   CreateWorkspaceOptions,
   ProvisionWorkspaceOptions,

@@ -636,6 +636,7 @@ export class MessagesResource {
         to: request.to,
         text: request.text,
         scheduledAt: request.scheduledAt,
+        ...(request.timezone && { timezone: request.timezone }),
         ...(request.from && { from: request.from }),
         ...(request.messageType && { messageType: request.messageType }),
         ...(request.metadata && { metadata: request.metadata }),

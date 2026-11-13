@@ -25,6 +25,7 @@ export class ConversationsResource {
     if (options?.limit) params.set("limit", String(options.limit));
     if (options?.offset) params.set("offset", String(options.offset));
     if (options?.status) params.set("status", options.status);
+    if (options?.label) params.set("label", options.label);
     const qs = params.toString();
     return this.http.request<ConversationListResponse>({
       method: "GET",

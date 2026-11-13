@@ -219,6 +219,19 @@ describe("Short codes resource", () => {
     expect(result.payment).toEqual({ status: "paid", charged: true });
   });
 
+  it("update() and submit() send the idempotency key they are given", async () => {
+    fetchMock.mockResolvedValue(mockFetchResponse(view));
+
+    await client.shortCodes.application.update({ useCase: "Order alerts" }, { idempotencyKey: "sc-save-1" });
+    await client.shortCodes.application.submit({ acceptTerms: true }, { idempotencyKey: "sc-submit-1" });
+
+    const keyOf = (index: number) => (fetchMock.mock.calls[index][1].headers as Record<string, string>)["Idempotency-Key"];
+    expect(fetchMock.mock.calls[0][1].method).toBe("PUT");
+    expect(keyOf(0)).toBe("sc-save-1");
+    expect(String(fetchMock.mock.calls[1][0])).toMatch(/\/short_codes\/application\/submit$/);
+    expect(keyOf(1)).toBe("sc-submit-1");
+  });
+
   it("application.get() carries the suggestions from the business details and Sendly's suggested wording", async () => {
     fetchMock.mockResolvedValue(
       mockFetchResponse({

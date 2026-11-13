@@ -1143,6 +1143,8 @@ export interface ListConversationsOptions {
   limit?: number;
   offset?: number;
   status?: ConversationStatus;
+  /** Only conversations with this label id */
+  label?: string;
 }
 
 export interface ConversationListResponse {
@@ -1194,6 +1196,10 @@ export interface SuggestRepliesResponse {
   suggestions: SuggestedReply[];
   basedOnMessageId?: string;
   model?: string;
+  /** True when the workspace's enterprise account turned AI suggestions off; `suggestions` is then empty */
+  disabled?: true;
+  /** Why suggestions are off, present with `disabled` */
+  reason?: "enterprise_policy";
 }
 
 export interface ConversationContext {
@@ -1415,6 +1421,14 @@ export interface ScheduleMessageRequest {
   scheduledAt: string;
 
   /**
+   * A time zone label stored with the scheduled message and returned as
+   * sent, such as `America/New_York`. It does not change when the message
+   * goes: `scheduledAt` is read as given, so include its offset or `Z`.
+   * The API stores `UTC` when it is left out.
+   */
+  timezone?: string;
+
+  /**
    * Sender ID (optional, for international destinations only)
    * For US/Canada: This is ignored - toll-free number pool is used
    */
@@ -1476,6 +1490,12 @@ export interface ScheduledMessage {
    * When the message is scheduled to send (ISO 8601)
    */
   scheduledAt: string;
+
+  /**
+   * The time zone label the message was scheduled with: the `timezone`
+   * sent, or `UTC`. It does not change when the message goes.
+   */
+  timezone?: string | null;
 
   /**
    * Credits reserved for this message
@@ -3022,6 +3042,54 @@ export interface WebhookBackfillResult {
 }
 
 /**
+ * Options for previewing a webhook recovery
+ */
+export interface WebhookRecoveryPreviewOptions {
+  /** Window start, ISO-8601 (default: now − 24h) */
+  since?: string;
+  /** Window end, ISO-8601 (default: now) */
+  until?: string;
+  /** Event types to count (default: all) */
+  eventTypes?: WebhookEventType[];
+}
+
+/**
+ * What a webhook recovery would do for a window, without sending anything.
+ * Keys come back from the API in camelCase and are passed through unchanged.
+ */
+export interface WebhookRecoveryPreview {
+  circuitState: CircuitState;
+  /** When the circuit opened, or null */
+  circuitOpenedAt: string | null;
+  /** Failed deliveries in the current streak */
+  failureCount: number;
+  /** Failed and cancelled deliveries in the window: what `redeliver` would send */
+  auditFailures: {
+    total: number;
+    byStatus: Record<string, number>;
+    byEventType: Record<string, number>;
+  };
+  /** Message events with no delivery in the window: what `backfill` would send */
+  missingFromMessages: {
+    total: number;
+    byEventType: Record<string, number>;
+  };
+  /** The window in up to 24 equal buckets, oldest first */
+  histogram: Array<{ bucket: string; missing: number; failed: number }>;
+  /** Up to 5 affected events: failed deliveries first, then missing message events */
+  samples: Array<{
+    id: string;
+    toMasked: string;
+    eventType: string;
+    occurredAt: string;
+  }>;
+  /** The outage window, when the circuit has an opening time */
+  windowSuggestion: { since: string; until: string } | null;
+  since: string;
+  until: string;
+}
+
+/**
  * A webhook delivery attempt
  */
 export interface WebhookDelivery {
@@ -4199,6 +4267,81 @@ export interface EnterpriseWorkspaceSummary {
   verificationType: string | null;
   tollFreeNumber: string | null;
   creditBalance: number;
+}
+
+/**
+ * Filters for `enterprise.workspaces.list()`. Every field is
+ * optional; without any, the API returns the first 50 workspaces, newest first.
+ */
+export interface ListEnterpriseWorkspacesOptions {
+  /** Page size, up to 100 (default 50) */
+  limit?: number;
+  /** The page, starting at 1 */
+  page?: number;
+  /** Only workspaces whose name contains this, ignoring case */
+  search?: string;
+  /** Only workspaces with this status; `all`, the default, keeps all */
+  status?: string;
+  /** Only workspaces whose verification has this status; `unverified` keeps those with none, `all` keeps all */
+  verification?: string;
+  /** The order (default `created_desc`, newest first) */
+  sort?:
+    | "created_desc"
+    | "created_asc"
+    | "name_asc"
+    | "name_desc"
+    | "credits_desc"
+    | "credits_asc";
+  /** Only workspaces with at least one of these tag ids */
+  tags?: string[];
+  /** `true` returns the compact list */
+  compact?: boolean;
+}
+
+/**
+ * Totals over every workspace, before filters and paging.
+ */
+export interface EnterpriseWorkspacesSummary {
+  /** Every workspace's credit balance added up */
+  totalCredits: number;
+  /** Up to 10 workspaces whose verification is waiting */
+  pendingVerifications: Array<{ id: string; name: string }>;
+  /** Every workspace counted once by its verification status */
+  verificationBreakdown: {
+    verified: number;
+    pending: number;
+    submitted: number;
+    rejected: number;
+    unverified: number;
+  };
+}
+
+/**
+ * A page of `enterprise.workspaces.list()`.
+ */
+export interface EnterpriseWorkspaceList {
+  workspaces: EnterpriseWorkspace[];
+  maxWorkspaces: number;
+  workspacesUsed: number;
+  pagination?: {
+    total: number;
+    limit: number | null;
+    page: number | null;
+    totalPages: number | null;
+    hasMore: boolean;
+  };
+  summary?: EnterpriseWorkspacesSummary;
+}
+
+/**
+ * `enterprise.workspaces.list({ compact: true })`: every workspace's id, name
+ * and balance, newest first, ignoring the other filters and paging.
+ */
+export interface EnterpriseWorkspaceCompactList {
+  workspaces: Array<{ id: string; name: string; creditBalance: number }>;
+  maxWorkspaces: number;
+  workspacesUsed: number;
+  summary?: EnterpriseWorkspacesSummary;
 }
 
 export interface EnterpriseWorkspace {

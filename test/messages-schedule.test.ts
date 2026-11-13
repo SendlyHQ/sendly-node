@@ -76,6 +76,36 @@ describe("Scheduled Messages", () => {
         );
       });
 
+      it("sends timezone when given and reads it back", async () => {
+        fetchMock.mockResolvedValue(
+          mockFetchResponse({ ...mockScheduled, timezone: "America/New_York" }),
+        );
+
+        const result = await client.messages.schedule({
+          to: "+15551234567",
+          text: "Scheduled reminder",
+          scheduledAt: "2025-01-19T10:00:00-05:00",
+          timezone: "America/New_York",
+        });
+
+        const callBody = JSON.parse(fetchMock.mock.calls[0][1].body);
+        expect(callBody.timezone).toBe("America/New_York");
+        expect(result.timezone).toBe("America/New_York");
+      });
+
+      it("omits timezone when not given", async () => {
+        fetchMock.mockResolvedValue(mockFetchResponse(mockScheduled));
+
+        await client.messages.schedule({
+          to: "+15551234567",
+          text: "Scheduled reminder",
+          scheduledAt: "2025-01-20T10:00:00Z",
+        });
+
+        const callBody = JSON.parse(fetchMock.mock.calls[0][1].body);
+        expect(callBody).not.toHaveProperty("timezone");
+      });
+
       it("should schedule a message with custom sender ID", async () => {
         fetchMock.mockResolvedValue(mockFetchResponse(mockScheduled));
 

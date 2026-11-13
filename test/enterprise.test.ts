@@ -33,6 +33,123 @@ describe("Enterprise resource", () => {
     vi.restoreAllMocks();
   });
 
+  describe("workspaces.list()", () => {
+    const listed = {
+      workspaces: [],
+      max_workspaces: 10,
+      workspaces_used: 0,
+      pagination: { page: 2, limit: 25, total: 0, total_pages: 0 },
+    };
+
+    it("sends the filters the API reads", async () => {
+      fetchMock.mockResolvedValue(mockFetchResponse(listed));
+
+      await client.enterprise.workspaces.list({
+        limit: 25,
+        page: 2,
+        search: "acme",
+        status: "active",
+        verification: "unverified",
+        sort: "name_asc",
+        tags: ["tag_1", "tag_2"],
+        compact: true,
+      });
+
+      const url = new URL(String(fetchMock.mock.calls[0][0]));
+      expect(url.pathname).toMatch(/\/v1\/enterprise\/workspaces$/);
+      expect(Object.fromEntries(url.searchParams)).toEqual({
+        limit: "25",
+        page: "2",
+        search: "acme",
+        status: "active",
+        verification: "unverified",
+        sort: "name_asc",
+        tags: "tag_1,tag_2",
+        compact: "true",
+      });
+    });
+
+    it("sends no query without filters", async () => {
+      fetchMock.mockResolvedValue(mockFetchResponse(listed));
+
+      await client.enterprise.workspaces.list();
+
+      const url = new URL(String(fetchMock.mock.calls[0][0]));
+      expect(url.search).toBe("");
+    });
+
+    it("reads paging with hasMore", async () => {
+      fetchMock.mockResolvedValue(
+        mockFetchResponse({ ...listed, pagination: { ...listed.pagination, has_more: true } }),
+      );
+
+      const page = await client.enterprise.workspaces.list({ page: 2, limit: 25 });
+
+      expect(page.pagination).toEqual({ page: 2, limit: 25, total: 0, totalPages: 0, hasMore: true });
+    });
+
+    it("reads the compact list", async () => {
+      fetchMock.mockResolvedValue(
+        mockFetchResponse({
+          workspaces: [{ id: "org_1", name: "Acme", creditBalance: 1200 }],
+          maxWorkspaces: 10,
+          workspacesUsed: 1,
+        }),
+      );
+
+      const compact = await client.enterprise.workspaces.list({ compact: true });
+
+      expect(compact.workspaces[0]).toEqual({ id: "org_1", name: "Acme", creditBalance: 1200 });
+      expect(compact.workspacesUsed).toBe(1);
+    });
+  });
+
+  describe("uploadVerificationDocument()", () => {
+    const uploaded = { url: "https://cdn.example/doc.pdf", id: "upload_1" };
+
+    function sentFile(): File {
+      const form = fetchMock.mock.calls[0][1].body as FormData;
+      return form.get("file") as File;
+    }
+
+    it("sends a Buffer with the content type its filename names", async () => {
+      fetchMock.mockResolvedValue(mockFetchResponse(uploaded));
+
+      await client.enterprise.uploadVerificationDocument(Buffer.from("%PDF-1.4"), {
+        filename: "registration.PDF",
+        verificationId: "bv_1",
+      });
+
+      const form = fetchMock.mock.calls[0][1].body as FormData;
+      expect(sentFile().type).toBe("application/pdf");
+      expect(sentFile().name).toBe("registration.PDF");
+      expect(form.get("verificationId")).toBe("bv_1");
+      expect(fetchMock.mock.calls[0][0]).toContain("/v1/enterprise/verification-document/upload");
+    });
+
+    it("sends the contentType it is given", async () => {
+      fetchMock.mockResolvedValue(mockFetchResponse(uploaded));
+
+      await client.enterprise.uploadVerificationDocument(Buffer.from("png"), {
+        contentType: "image/png",
+      });
+
+      expect(sentFile().type).toBe("image/png");
+      expect(sentFile().name).toBe("document");
+    });
+
+    it("keeps a Blob's own type", async () => {
+      fetchMock.mockResolvedValue(mockFetchResponse(uploaded));
+
+      await client.enterprise.uploadVerificationDocument(
+        new Blob(["jpg"], { type: "image/jpeg" }),
+        { filename: "scan" },
+      );
+
+      expect(sentFile().type).toBe("image/jpeg");
+    });
+  });
+
   describe("workspaces.inheritVerification()", () => {
     const inherited = {
       verificationId: "bv_2",

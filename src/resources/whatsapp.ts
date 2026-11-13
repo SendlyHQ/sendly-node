@@ -55,6 +55,7 @@
  */
 
 import type { HttpClient } from "../utils/http";
+import type { IdempotentRequestOptions } from "../types";
 import { ValidationError } from "../errors";
 import { validatePhoneNumber } from "../utils/validation";
 
@@ -611,6 +612,9 @@ class WhatsAppSignupResource {
    * nothing back.
    *
    * @param request - The number to connect
+   * @param options - Optional idempotency key. The SDK sends a fresh key per
+   *   call; pass your own to make a retry from your own code (or after a
+   *   restart) return the first signup instead of starting another.
    * @returns The signup with its `connectUrl`
    *
    * @example
@@ -632,6 +636,7 @@ class WhatsAppSignupResource {
    */
   create(
     request: StartWhatsAppSignupRequest & { businessAccountId?: undefined },
+    options?: IdempotentRequestOptions,
   ): Promise<WhatsAppSignupSession>;
   /**
    * Add a number to a WhatsApp Business Account this workspace has already
@@ -655,6 +660,9 @@ class WhatsAppSignupResource {
    * refunded. Only a 429 the API never ran is retried.
    *
    * @param request - The number, the connected account's id, and optionally the code method and display name
+   * @param options - Optional idempotency key. Since a failed attempt is not
+   *   retried, pass the same key when you call again so a request that did
+   *   run returns its signup instead of starting, and charging, another.
    * @returns The `verifying` signup
    *
    * @example
@@ -675,10 +683,17 @@ class WhatsAppSignupResource {
    * @throws {SendlyError} `whatsapp_signup_in_progress` (409) while a Facebook connection for the number is in flight (`error.response.id` is that signup), or `whatsapp_already_enabled` (409) if it is already connected
    * @throws {SendlyError} `whatsapp_verification_start_failed`: 422 when WhatsApp refused to send a code (final), or 503 when it couldn't be reached. Either way the signup failed and the fee is refunded; start again. Not retried automatically.
    */
-  create(request: AddWhatsAppNumberRequest): Promise<WhatsAppSignup>;
-  create(request: StartWhatsAppSignupRequest): Promise<WhatsAppSignupSession>;
+  create(
+    request: AddWhatsAppNumberRequest,
+    options?: IdempotentRequestOptions,
+  ): Promise<WhatsAppSignup>;
+  create(
+    request: StartWhatsAppSignupRequest,
+    options?: IdempotentRequestOptions,
+  ): Promise<WhatsAppSignupSession>;
   async create(
     request: StartWhatsAppSignupRequest | AddWhatsAppNumberRequest,
+    options?: IdempotentRequestOptions,
   ): Promise<WhatsAppSignupSession | WhatsAppSignup> {
     validatePhoneNumber(request.phoneNumber);
     const addition = request as Partial<AddWhatsAppNumberRequest>;
@@ -695,6 +710,7 @@ class WhatsAppSignupResource {
       return this.http.request<WhatsAppSignupSession>({
         method: "POST",
         path: "/whatsapp/signup",
+        idempotencyKey: options?.idempotencyKey,
         body: { phoneNumber: request.phoneNumber },
       });
     }
@@ -710,6 +726,7 @@ class WhatsAppSignupResource {
       method: "POST",
       path: "/whatsapp/signup",
       retryUnsentOnly: true,
+      idempotencyKey: options?.idempotencyKey,
       body: {
         phoneNumber: request.phoneNumber,
         businessAccountId: addition.businessAccountId,
@@ -1191,6 +1208,8 @@ class WhatsAppTemplatesResource {
    * still accepted, with a warning.
    *
    * @param request - The template definition
+   * @param options - Optional idempotency key, so a repeat of the same create
+   *   returns the first template instead of submitting a second one
    * @returns The created template (status `PENDING`), with any submission warnings
    *
    * @example
@@ -1212,12 +1231,14 @@ class WhatsAppTemplatesResource {
    */
   async create(
     request: CreateWhatsAppTemplateRequest,
+    options?: IdempotentRequestOptions,
   ): Promise<WhatsAppTemplate> {
     validatePhoneNumber(request.sender);
 
     return this.http.request<WhatsAppTemplate>({
       method: "POST",
       path: "/whatsapp/templates",
+      idempotencyKey: options?.idempotencyKey,
       body: {
         sender: request.sender,
         name: request.name,

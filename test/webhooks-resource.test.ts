@@ -7,6 +7,7 @@ import { Sendly } from "../src/client";
 import { SendlyError, ValidationError } from "../src/errors";
 import type {
   WebhookDelivery,
+  WebhookRecoveryPreview,
   WebhookSecretRotation,
   WebhookTestResult,
 } from "../src/types";
@@ -243,6 +244,92 @@ describe("Webhooks resource", () => {
       expect(rotation.rotatedAt).toBe("2026-09-25T10:00:00.000Z");
       expect(rotation.gracePeriodHours).toBe(24);
       expect(rotation.webhook).toBeUndefined();
+    });
+  });
+
+  describe("recoveryPreview()", () => {
+    const preview = {
+      circuitState: "open",
+      circuitOpenedAt: "2026-09-24T08:00:00.000Z",
+      failureCount: 12,
+      auditFailures: {
+        total: 3,
+        byStatus: { failed: 2, cancelled: 1 },
+        byEventType: { "message.delivered": 2, "message.opt_out": 1 },
+      },
+      missingFromMessages: {
+        total: 4,
+        byEventType: { "message.sent": 4 },
+      },
+      histogram: [
+        { bucket: "2026-09-24T08:00:00.000Z", missing: 4, failed: 3 },
+      ],
+      samples: [
+        {
+          id: "msg_1",
+          toMasked: "+1555***4567",
+          eventType: "message.delivered",
+          occurredAt: "2026-09-24T08:30:00.000Z",
+        },
+      ],
+      windowSuggestion: {
+        since: "2026-09-24T08:00:00.000Z",
+        until: "2026-09-24T10:00:00.000Z",
+      },
+      since: "2026-09-23T10:00:00.000Z",
+      until: "2026-09-24T10:00:00.000Z",
+    };
+
+    it("sends since, until and comma-separated event_types and keeps the camelCase keys", async () => {
+      fetchMock.mockResolvedValue(mockFetchResponse(preview));
+
+      const result: WebhookRecoveryPreview = await client.webhooks.recoveryPreview(
+        "whk_1",
+        {
+          since: "2026-09-23T10:00:00.000Z",
+          until: "2026-09-24T10:00:00.000Z",
+          eventTypes: ["message.delivered", "message.failed"],
+        },
+      );
+
+      const [calledUrl, init] = fetchMock.mock.calls[0];
+      const url = new URL(calledUrl);
+      expect(init.method).toBe("GET");
+      expect(url.pathname).toBe("/api/v1/webhooks/whk_1/recovery-preview");
+      expect(url.searchParams.get("since")).toBe("2026-09-23T10:00:00.000Z");
+      expect(url.searchParams.get("until")).toBe("2026-09-24T10:00:00.000Z");
+      expect(url.searchParams.get("event_types")).toBe(
+        "message.delivered,message.failed",
+      );
+
+      expect(result.circuitState).toBe("open");
+      expect(result.circuitOpenedAt).toBe("2026-09-24T08:00:00.000Z");
+      expect(result.failureCount).toBe(12);
+      expect(result.auditFailures.byStatus.cancelled).toBe(1);
+      expect(result.auditFailures.byEventType["message.opt_out"]).toBe(1);
+      expect(result.missingFromMessages.total).toBe(4);
+      expect(result.histogram[0].missing).toBe(4);
+      expect(result.samples[0].toMasked).toBe("+1555***4567");
+      expect(result.windowSuggestion?.since).toBe("2026-09-24T08:00:00.000Z");
+    });
+
+    it("sends no query when no options are given", async () => {
+      fetchMock.mockResolvedValue(
+        mockFetchResponse({ ...preview, circuitOpenedAt: null, windowSuggestion: null }),
+      );
+
+      const result = await client.webhooks.recoveryPreview("whk_1");
+
+      const url = new URL(fetchMock.mock.calls[0][0]);
+      expect(url.search).toBe("");
+      expect(result.windowSuggestion).toBeNull();
+    });
+
+    it("rejects an id that is not whk_ prefixed before any request", async () => {
+      await expect(client.webhooks.recoveryPreview("bad")).rejects.toThrow(
+        "Invalid webhook ID format",
+      );
+      expect(fetchMock).not.toHaveBeenCalled();
     });
   });
 });

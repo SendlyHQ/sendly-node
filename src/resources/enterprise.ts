@@ -46,6 +46,9 @@ export interface VerificationSubmitInput {
 import type {
   EnterpriseAccount,
   EnterpriseWorkspace,
+  ListEnterpriseWorkspacesOptions,
+  EnterpriseWorkspaceList,
+  EnterpriseWorkspaceCompactList,
   EnterpriseWorkspaceDetail,
   CreateWorkspaceOptions,
   ProvisionWorkspaceOptions,
@@ -113,16 +116,40 @@ class WorkspacesSubResource {
     return transformKeys<EnterpriseWorkspace>(response);
   }
 
-  async list(): Promise<{
-    workspaces: EnterpriseWorkspace[];
-    maxWorkspaces: number;
-    workspacesUsed: number;
-    pagination?: { page: number; limit: number; total: number; totalPages: number };
-    summary?: { totalCredits: number; totalMessages30d: number; verified: number; pending: number; unverified: number };
-  }> {
+  /**
+   * List the enterprise's workspaces, newest first by default.
+   *
+   * @param options - Optional filters: `search`, `status`, `verification`, `sort`, `tags`, `compact`, and `page` and `limit` for paging
+   *
+   * @example
+   * ```typescript
+   * const { workspaces } = await sendly.enterprise.workspaces.list({
+   *   search: 'acme',
+   *   verification: 'unverified',
+   *   sort: 'name_asc',
+   * });
+   * ```
+   */
+  async list(
+    options: ListEnterpriseWorkspacesOptions & { compact: true },
+  ): Promise<EnterpriseWorkspaceCompactList>;
+  async list(options?: ListEnterpriseWorkspacesOptions): Promise<EnterpriseWorkspaceList>;
+  async list(
+    options: ListEnterpriseWorkspacesOptions = {},
+  ): Promise<EnterpriseWorkspaceList | EnterpriseWorkspaceCompactList> {
     const response = await this.http.request<unknown>({
       method: "GET",
       path: "/enterprise/workspaces",
+      query: {
+        limit: options.limit,
+        page: options.page,
+        search: options.search,
+        status: options.status,
+        verification: options.verification,
+        sort: options.sort,
+        tags: options.tags?.length ? options.tags.join(",") : undefined,
+        compact: options.compact ? true : undefined,
+      },
     });
 
     return transformKeys(response);
@@ -858,17 +885,47 @@ export class EnterpriseResource {
     return response;
   }
 
+  /**
+   * Upload a business registration document for a toll-free verification.
+   *
+   * The API takes a PNG, JPEG, GIF or WEBP image, or a PDF, up to 10 MB, and
+   * refuses any other content type. The type sent is `contentType` when
+   * given, else a Blob's own type, else the one `filename`'s extension
+   * names (`.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.pdf`).
+   *
+   * @param file - The document's bytes
+   * @param options - `workspaceId` or `verificationId` to attach it to, `filename`, and `contentType`
+   * @returns The stored document's `url` and `id`
+   *
+   * @example
+   * ```typescript
+   * const doc = await sendly.enterprise.uploadVerificationDocument(
+   *   fs.readFileSync('registration.pdf'),
+   *   { filename: 'registration.pdf', verificationId: 'bv_xxx' },
+   * );
+   * ```
+   */
   async uploadVerificationDocument(
     file: Buffer | Blob,
-    options?: { workspaceId?: string; verificationId?: string; filename?: string },
+    options?: {
+      workspaceId?: string;
+      verificationId?: string;
+      filename?: string;
+      contentType?: string;
+    },
   ): Promise<{ url: string; id: string }> {
     const formData = new FormData();
+    const filename = options?.filename || "document";
+    const contentType =
+      options?.contentType ||
+      (file instanceof Blob && file.type) ||
+      verificationDocumentType(filename);
 
-    if (file instanceof Blob) {
-      formData.append("file", file, options?.filename || "document");
+    if (file instanceof Blob && file.type === (contentType || "")) {
+      formData.append("file", file, filename);
     } else {
-      const blob = new Blob([file]);
-      formData.append("file", blob, options?.filename || "document");
+      const blob = new Blob([file], contentType ? { type: contentType } : {});
+      formData.append("file", blob, filename);
     }
 
     if (options?.workspaceId) {
@@ -883,4 +940,19 @@ export class EnterpriseResource {
       formData,
     );
   }
+}
+
+const VERIFICATION_DOCUMENT_TYPES: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  pdf: "application/pdf",
+};
+
+function verificationDocumentType(filename: string): string | undefined {
+  const dot = filename.lastIndexOf(".");
+  if (dot < 0) return undefined;
+  return VERIFICATION_DOCUMENT_TYPES[filename.slice(dot + 1).toLowerCase()];
 }

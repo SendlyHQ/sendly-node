@@ -21,6 +21,8 @@ import type {
   WebhookRedeliverResult,
   WebhookBackfillOptions,
   WebhookBackfillResult,
+  WebhookRecoveryPreview,
+  WebhookRecoveryPreviewOptions,
 } from "../types";
 
 /**
@@ -393,6 +395,49 @@ export class WebhooksResource {
     });
 
     return transformKeys<WebhookBackfillResult>(response);
+  }
+
+  /**
+   * Preview a recovery: count what `redeliver` and `backfill` would send
+   * for a window, without sending anything.
+   *
+   * The window is at most 7 days long. Unlike the other webhook responses,
+   * the preview's keys are camelCase on the wire, and the SDK returns them
+   * unchanged (event-type keys such as `message.opt_out` keep their
+   * underscores).
+   *
+   * @param id - Webhook ID
+   * @param options - Window and event types to count
+   * @returns Circuit state, failed and missing counts, a histogram and samples
+   *
+   * @example
+   * ```typescript
+   * const preview = await sendly.webhooks.recoveryPreview('whk_xxx', {
+   *   since: '2026-05-01T00:00:00Z',
+   *   eventTypes: ['message.delivered', 'message.failed'],
+   * });
+   * console.log(preview.auditFailures.total, preview.missingFromMessages.total);
+   * ```
+   */
+  async recoveryPreview(
+    id: string,
+    options: WebhookRecoveryPreviewOptions = {},
+  ): Promise<WebhookRecoveryPreview> {
+    if (!id || !id.startsWith("whk_")) {
+      throw new Error("Invalid webhook ID format");
+    }
+
+    return this.http.request<WebhookRecoveryPreview>({
+      method: "GET",
+      path: `/webhooks/${encodeURIComponent(id)}/recovery-preview`,
+      query: {
+        since: options.since,
+        until: options.until,
+        event_types: options.eventTypes?.length
+          ? options.eventTypes.join(",")
+          : undefined,
+      },
+    });
   }
 
   /**
